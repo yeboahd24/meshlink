@@ -60,6 +60,36 @@ Camera → H.264 Encode → P2P Publish → P2P Receive → H.264 Decode → Dis
 - **Efficient**: Multicast distribution saves bandwidth
 - **Resilient**: Mesh network has no single point of failure
 
+## 📱 Deployment Platforms
+
+### Broadcaster Applications
+- **Desktop**: Windows, macOS, Linux (Go + Fyne)
+- **Raspberry Pi**: ARM builds for $35 hardware
+- **Features**: Camera preview, quality controls, viewer statistics
+
+### Viewer Applications
+- **Mobile Apps**: iOS App Store, Google Play Store
+- **Desktop**: Windows, macOS, Linux applications
+- **Web App**: Progressive Web App (PWA) for browsers
+- **Features**: Auto-discovery, HD video, touch controls, offline operation
+
+### Real-World Usage
+```
+Church Staff (Broadcaster)
+├── Desktop/Laptop App
+├── Camera preview & controls
+├── One-click start/stop
+└── Live viewer count
+
+Congregation (Viewers)
+├── Mobile Apps (Primary)
+│   ├── iOS App Store
+│   ├── Google Play Store
+│   └── Auto-discovers streams
+├── Desktop Apps (Secondary)
+└── Web Browser (Fallback)
+```
+
 ## 🚀 Quick Start
 
 ### Broadcaster (Church Setup)
@@ -70,6 +100,12 @@ go run cmd/broadcaster/main.go
 ### Viewer (Congregation)
 ```bash
 go run cmd/viewer/main.go
+```
+
+### Mobile Development (Coming Soon)
+```bash
+# iOS/Android apps in development
+# Will use same P2P core with native mobile UI
 ```
 
 ## 📁 Project Structure
