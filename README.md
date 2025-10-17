@@ -92,15 +92,87 @@ Congregation (Viewers)
 
 ## 🚀 Quick Start
 
-### Broadcaster (Church Setup)
+### Development Mode
 ```bash
+# Broadcaster (Church Setup)
 go run cmd/broadcaster/main.go
-```
 
-### Viewer (Congregation)
-```bash
+# Viewer (Congregation)
 go run cmd/viewer/main.go
 ```
+
+## 💻 Production Deployment
+
+### Build for Production
+```bash
+# Build for all platforms
+make build-all
+
+# Creates binaries in dist/ folder:
+# - broadcaster-windows-amd64.exe
+# - viewer-windows-amd64.exe
+# - broadcaster-darwin-amd64 (macOS)
+# - viewer-linux-amd64
+# - broadcaster-linux-arm7 (Raspberry Pi)
+```
+
+### Church Setup (Zero Installation)
+
+#### Broadcaster (Church Staff)
+1. **Copy files** to laptop:
+   ```
+   broadcaster.exe
+   config.json
+   ```
+2. **Connect camera** (USB webcam or built-in)
+3. **Double-click** `broadcaster.exe`
+4. **Click "Start Broadcasting"** → Live streaming begins
+
+#### Viewers (Congregation)
+1. **Copy files** to laptops:
+   ```
+   viewer.exe
+   config.json
+   ```
+2. **Connect to church WiFi**
+3. **Double-click** `viewer.exe`
+4. **Click "Connect"** → Automatically finds and joins stream
+
+### Distribution Options
+
+#### Option 1: Direct Download
+```
+Church downloads from website:
+├── meshlink-broadcaster-windows.zip
+├── meshlink-viewer-windows.zip
+└── Quick setup guide
+```
+
+#### Option 2: Hardware Kit ($299)
+```
+Church Streaming Kit:
+├── Raspberry Pi (broadcaster)
+├── USB camera
+├── WiFi router
+├── USB drives with viewer apps
+└── Setup instructions
+```
+
+#### Option 3: App Store (Future)
+```
+Microsoft Store / Mac App Store:
+├── MeshLink Broadcaster (Church staff)
+├── MeshLink Viewer (Congregation)
+└── One-click install
+```
+
+### Production Benefits
+- ✅ **Single executable** - no dependencies to install
+- ✅ **Portable** - runs from USB stick or any folder
+- ✅ **Self-contained** - all libraries bundled
+- ✅ **Cross-platform** - same process for Windows/macOS/Linux
+- ✅ **Zero IT support** - just copy and run
+- ✅ **Instant setup** - ready in 30 seconds
 
 ### Mobile Development (Coming Soon)
 ```bash
