@@ -1,0 +1,118 @@
+openapi: 3.0.3
+info:
+  title: MeshLink Church Streaming API
+  description: Cloud API for analytics, user management, and premium features
+  version: 1.0.0
+  contact:
+    name: MeshLink Team
+    email: api@meshlink.com
+
+servers:
+  - url: https://api.meshlink.com/v1
+    description: Production server
+  - url: https://staging-api.meshlink.com/v1
+    description: Staging server
+
+paths:
+  /churches:
+    get:
+      summary: List registered churches
+      tags: [Churches]
+      responses:
+        '200':
+          description: List of churches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Church'
+    
+    post:
+      summary: Register a new church
+      tags: [Churches]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChurchRegistration'
+      responses:
+        '201':
+          description: Church registered successfully
+
+  /analytics/streams:
+    get:
+      summary: Get streaming analytics
+      tags: [Analytics]
+      parameters:
+        - name: church_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamAnalytics'
+
+components:
+  schemas:
+    Church:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        location:
+          type: string
+        subscription_tier:
+          type: string
+          enum: [free, premium, enterprise]
+        created_at:
+          type: string
+          format: date-time
+
+    ChurchRegistration:
+      type: object
+      required: [name, email, location]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        location:
+          type: string
+        phone:
+          type: string
+
+    StreamAnalytics:
+      type: object
+      properties:
+        total_streams:
+          type: integer
+        total_viewers:
+          type: integer
+        average_duration:
+          type: number
+        peak_concurrent:
+          type: integer
+        viewer_locations:
+          type: array
+          items:
+            type: object

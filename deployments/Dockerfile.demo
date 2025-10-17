@@ -1,0 +1,11 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Create simple web interface for demo
+COPY deployments/demo-ui/ ./
+
+RUN npm install express ws
+
+EXPOSE 3000
+CMD ["node", "server.js"]

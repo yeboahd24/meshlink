@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Development environment with all dependencies
+  dev-env:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.dev
+    volumes:
+      - ..:/workspace
+      - go-cache:/go/pkg/mod
+    working_dir: /workspace
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "8082:8082"
+    networks:
+      - meshlink-dev
+    stdin_open: true
+    tty: true
+    command: tail -f /dev/null
+
+  # Production broadcaster
+  broadcaster:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.broadcaster
+    ports:
+      - "9080:8080"
+    networks:
+      - meshlink-dev
+    environment:
+      - DISPLAY_MODE=headless
+    depends_on:
+      - dev-env
+
+  # Production viewer 1
+  viewer1:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.viewer
+    ports:
+      - "9081:8080"
+    networks:
+      - meshlink-dev
+    environment:
+      - DISPLAY_MODE=headless
+    depends_on:
+      - broadcaster
+
+  # Production viewer 2
+  viewer2:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.viewer
+    ports:
+      - "9082:8080"
+    networks:
+      - meshlink-dev
+    environment:
+      - DISPLAY_MODE=headless
+    depends_on:
+      - broadcaster
+
+  # Demo dashboard
+  demo-ui:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.demo
+    ports:
+      - "3000:3000"
+    networks:
+      - meshlink-dev
+    depends_on:
+      - broadcaster
+      - viewer1
+      - viewer2
+
+networks:
+  meshlink-dev:
+    driver: bridge
+
+volumes:
+  go-cache:

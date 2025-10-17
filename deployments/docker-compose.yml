@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  broadcaster:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.simple
+    ports:
+      - "8080:8080"
+    networks:
+      - meshlink
+    environment:
+      - APP_NAME=Broadcaster
+    command: ["./demo", "Broadcaster"]
+    stdin_open: true
+    tty: true
+
+  viewer1:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.simple
+    ports:
+      - "8081:8080"
+    networks:
+      - meshlink
+    environment:
+      - APP_NAME=Viewer1
+    command: ["./demo", "Viewer1"]
+    depends_on:
+      - broadcaster
+    stdin_open: true
+    tty: true
+
+  viewer2:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.simple
+    ports:
+      - "8082:8080"
+    networks:
+      - meshlink
+    environment:
+      - APP_NAME=Viewer2
+    command: ["./demo", "Viewer2"]
+    depends_on:
+      - broadcaster
+    stdin_open: true
+    tty: true
+
+  # Demo web interface
+  demo-ui:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile.demo
+    ports:
+      - "3000:3000"
+    networks:
+      - meshlink
+    depends_on:
+      - broadcaster
+      - viewer1
+      - viewer2
+
+networks:
+  meshlink:
+    driver: bridge

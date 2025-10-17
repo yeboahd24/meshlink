@@ -1,0 +1,10 @@
+FROM golang:1.21-alpine
+
+WORKDIR /app
+COPY demo/main.go .
+
+RUN go mod init meshlink-demo
+RUN go build -o demo main.go
+
+EXPOSE 8080
+CMD ["./demo", "meshlink"]

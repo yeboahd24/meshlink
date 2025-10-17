@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MeshLink Demo Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .status-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; }
+        .online { background: #4CAF50; }
+        .offline { background: #f44336; }
+        .logs { background: #000; color: #0f0; padding: 15px; border-radius: 4px; font-family: monospace; height: 200px; overflow-y: auto; }
+        .btn { background: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background: #1976D2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 MeshLink Demo Dashboard</h1>
+            <p>Offline P2P Church Streaming - Live Demo Environment</p>
+        </div>
+
+        <div class="status-grid">
+            <div class="card">
+                <h3>📡 Broadcaster Status</h3>
+                <p><span class="status-indicator online"></span>Broadcasting Live</p>
+                <p><strong>Connected Viewers:</strong> <span id="viewer-count">2</span></p>
+                <p><strong>Stream Quality:</strong> 720p @ 30fps</p>
+                <button class="btn" onclick="toggleBroadcast()">Stop Broadcast</button>
+            </div>
+
+            <div class="card">
+                <h3>👥 Viewer #1</h3>
+                <p><span class="status-indicator online"></span>Connected</p>
+                <p><strong>Port:</strong> 8081</p>
+                <p><strong>Latency:</strong> 8ms</p>
+                <button class="btn" onclick="openViewer(8081)">View Stream</button>
+            </div>
+
+            <div class="card">
+                <h3>👥 Viewer #2</h3>
+                <p><span class="status-indicator online"></span>Connected</p>
+                <p><strong>Port:</strong> 8082</p>
+                <p><strong>Latency:</strong> 12ms</p>
+                <button class="btn" onclick="openViewer(8082)">View Stream</button>
+            </div>
+
+            <div class="card">
+                <h3>🌐 Network Status</h3>
+                <p><span class="status-indicator online"></span>P2P Network Active</p>
+                <p><strong>Discovery:</strong> mDNS</p>
+                <p><strong>Protocol:</strong> libp2p</p>
+                <p><strong>Internet:</strong> Not Required ✅</p>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <h3>📊 Live Logs</h3>
+            <div class="logs" id="logs">
+                <div>[INFO] Broadcaster started with ID: 12D3KooWBroadcaster123</div>
+                <div>[INFO] Viewer1 connected from 172.18.0.3</div>
+                <div>[INFO] Viewer2 connected from 172.18.0.4</div>
+                <div>[INFO] P2P mesh network established</div>
+                <div>[INFO] Streaming at 720p, 2000kbps</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <h3>🎯 Demo Instructions</h3>
+            <ol>
+                <li><strong>Architecture:</strong> 1 Broadcaster + 2 Viewers running in Docker containers</li>
+                <li><strong>Network:</strong> All containers on isolated Docker network (simulates local WiFi)</li>
+                <li><strong>P2P Discovery:</strong> Automatic peer discovery via mDNS</li>
+                <li><strong>Streaming:</strong> Real-time data distribution via libp2p PubSub</li>
+                <li><strong>Scalability:</strong> Add more viewers by scaling the viewer service</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function toggleBroadcast() {
+            alert('In production: This would stop/start the broadcast stream');
+        }
+
+        function openViewer(port) {
+            alert(`In production: This would open viewer interface on port ${port}`);
+        }
+
+        // Simulate live logs
+        const logs = document.getElementById('logs');
+        const logMessages = [
+            '[INFO] Stream chunk published to topic',
+            '[INFO] Peer heartbeat received',
+            '[INFO] Network topology updated',
+            '[INFO] Quality adaptation: maintaining 720p',
+            '[INFO] Buffer status: optimal'
+        ];
+
+        setInterval(() => {
+            const msg = logMessages[Math.floor(Math.random() * logMessages.length)];
+            const timestamp = new Date().toLocaleTimeString();
+            logs.innerHTML += `<div>[${timestamp}] ${msg}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }, 3000);
+
+        // Update viewer count
+        setInterval(() => {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('viewer-count').textContent = data.broadcaster.viewers;
+                })
+                .catch(() => {}); // Ignore errors in demo
+        }, 5000);
+    </script>
+</body>
+</html>
