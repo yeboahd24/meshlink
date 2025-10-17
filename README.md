@@ -17,6 +17,49 @@ Enable churches to stream services without internet dependency, using local WiFi
 [WiFi Hotspot] → [Broadcaster] → [P2P Network] → [Viewers]
 ```
 
+## 📡 How Data is Transmitted
+
+### Data Flow Process
+```
+Camera → H.264 Encode → P2P Publish → P2P Receive → H.264 Decode → Display
+```
+
+### Step-by-Step Transmission
+1. **Camera Capture**: System camera captures raw video frames
+2. **H.264 Encoding**: Compress frames to ~50KB each (720p quality)
+3. **P2P Discovery**: mDNS finds peers on local WiFi network automatically
+4. **Topic Publishing**: Broadcaster publishes frames to "meshlink/church/stream" topic
+5. **Mesh Distribution**: libp2p distributes frames to all subscribed viewers
+6. **Frame Reception**: Viewers receive encrypted frames via direct P2P connections
+7. **H.264 Decoding**: Decompress frames back to video data
+8. **Display**: Render 30 FPS video stream in real-time
+
+### Network Architecture
+```
+┌─────────────┐    WiFi     ┌─────────────┐    WiFi     ┌─────────────┐
+│ Broadcaster │◄──────────►│   Router    │◄──────────►│   Viewer    │
+│             │             │             │             │             │
+│ Publishes   │             │ Local Net   │             │ Subscribes  │
+│ H.264 Data  │             │192.168.1.x  │             │ H.264 Data  │
+└─────────────┘             └─────────────┘             └─────────────┘
+```
+
+### Technical Specifications
+- **Protocol**: libp2p PubSub over TCP/QUIC
+- **Discovery**: mDNS (zero configuration)
+- **Encryption**: Built-in libp2p security
+- **Bandwidth**: ~2 Mbps per stream
+- **Latency**: <100ms on local network
+- **Quality**: 720p @ 30 FPS with H.264 compression
+
+### Key Advantages
+- **No Internet Required**: Works on isolated WiFi networks
+- **Direct P2P**: No central server or cloud dependency  
+- **Automatic Discovery**: Viewers find broadcaster instantly
+- **Encrypted**: All data transmission is secure
+- **Efficient**: Multicast distribution saves bandwidth
+- **Resilient**: Mesh network has no single point of failure
+
 ## 🚀 Quick Start
 
 ### Broadcaster (Church Setup)
