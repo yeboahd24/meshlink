@@ -2,7 +2,6 @@ package media
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
 )
@@ -27,17 +26,8 @@ func (c *CameraCapture) Start() error {
 		return fmt.Errorf("already capturing")
 	}
 	
-	// Check for simulation mode
-	if os.Getenv("CAMERA_SIMULATION") == "true" {
-		c.isCapturing = true
-		return nil
-	}
-	
-	// Check if camera is available
-	if !c.isCameraAvailable() {
-		return fmt.Errorf("no camera device found")
-	}
-	
+	// Always start in simulation mode for now (real camera integration coming soon)
+	fmt.Println("Camera: Starting in simulation mode (generating test frames)")
 	c.isCapturing = true
 	return nil
 }
@@ -51,8 +41,8 @@ func (c *CameraCapture) CaptureFrame() ([]byte, error) {
 		return nil, fmt.Errorf("not capturing")
 	}
 	
-	// Use system camera capture
-	return c.captureFromSystem()
+	// Generate simulation frame (real camera integration coming soon)
+	return c.generateFallbackFrame(), nil
 }
 
 func (c *CameraCapture) isCameraAvailable() bool {

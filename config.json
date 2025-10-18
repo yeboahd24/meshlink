@@ -1,1 +1,0 @@
-{"network":{"port":8080,"discovery_key":"meshlink-church","max_peers":50},"media":{"video_codec":"h264","audio_codec":"aac","bitrate":2000,"resolution":"1280x720","frame_rate":30},"ui":{"theme":"dark","fullscreen":false,"show_stats":true}}

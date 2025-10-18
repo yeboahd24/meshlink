@@ -17,10 +17,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Load configuration
+	// Load configuration (uses defaults if config.json missing)
 	cfg, err := config.LoadConfig("config.json")
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Printf("Config warning: %v, using defaults", err)
+		cfg = config.DefaultConfig()
 	}
 
 	// Initialize P2P node with config

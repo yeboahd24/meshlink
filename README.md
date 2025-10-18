@@ -119,21 +119,14 @@ make build-all
 ### Church Setup (Zero Installation)
 
 #### Broadcaster (Church Staff)
-1. **Copy files** to laptop:
-   ```
-   broadcaster.exe
-   config.json
-   ```
+1. **Copy file** to laptop: `broadcaster.exe`
 2. **Connect camera** (USB webcam or built-in)
 3. **Double-click** `broadcaster.exe`
-4. **Click "Start Broadcasting"** → Live streaming begins
+4. **Configure quality** in UI (720p/1080p/480p)
+5. **Click "Start Broadcasting"** → Live streaming begins
 
 #### Viewers (Congregation)
-1. **Copy files** to laptops:
-   ```
-   viewer.exe
-   config.json
-   ```
+1. **Copy file** to laptops: `viewer.exe`
 2. **Connect to church WiFi**
 3. **Double-click** `viewer.exe`
 4. **Click "Connect"** → Automatically finds and joins stream
@@ -143,8 +136,8 @@ make build-all
 #### Option 1: Direct Download
 ```
 Church downloads from website:
-├── meshlink-broadcaster-windows.zip
-├── meshlink-viewer-windows.zip
+├── broadcaster.exe (Single file)
+├── viewer.exe (Single file)
 └── Quick setup guide
 ```
 

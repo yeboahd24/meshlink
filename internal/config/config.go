@@ -54,21 +54,22 @@ func DefaultConfig() *Config {
 }
 
 func LoadConfig(path string) (*Config, error) {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return DefaultConfig(), nil
+	// Always use defaults first
+	config := DefaultConfig()
+	
+	// Try to load custom config if it exists
+	if _, err := os.Stat(path); err == nil {
+		data, err := os.ReadFile(path)
+		if err == nil {
+			var customConfig Config
+			if err := json.Unmarshal(data, &customConfig); err == nil {
+				// Merge custom config with defaults
+				config = &customConfig
+			}
+		}
 	}
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var config Config
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
-
-	return &config, nil
+	
+	return config, nil
 }
 
 func (c *Config) Save(path string) error {

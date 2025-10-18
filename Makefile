@@ -25,27 +25,33 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-# Build applications
+# Build applications (headless versions - no GUI dependencies)
 build: deps
 	mkdir -p $(BUILD_DIR)
-	$(GOBUILD) -o $(BUILD_DIR)/$(BROADCASTER_BINARY) ./cmd/broadcaster
-	$(GOBUILD) -o $(BUILD_DIR)/$(VIEWER_BINARY) ./cmd/viewer
+	$(GOBUILD) -buildvcs=false -o $(BUILD_DIR)/$(BROADCASTER_BINARY) ./cmd/broadcaster-headless
+	$(GOBUILD) -buildvcs=false -o $(BUILD_DIR)/$(VIEWER_BINARY) ./cmd/viewer-headless
 
-# Build for multiple platforms
+# Build GUI versions for current platform (requires X11/OpenGL)
+build-gui: deps
+	mkdir -p $(DIST_DIR)
+	$(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-gui ./cmd/broadcaster
+	$(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-gui ./cmd/viewer
+
+# Build for multiple platforms (headless versions for cross-compilation)
 build-all: deps
 	mkdir -p $(DIST_DIR)
 	# Windows
-	GOOS=windows GOARCH=amd64 $(GOBUILD) -o $(DIST_DIR)/$(BROADCASTER_BINARY)-windows-amd64.exe ./cmd/broadcaster
-	GOOS=windows GOARCH=amd64 $(GOBUILD) -o $(DIST_DIR)/$(VIEWER_BINARY)-windows-amd64.exe ./cmd/viewer
+	GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-windows-amd64.exe ./cmd/broadcaster-headless
+	GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-windows-amd64.exe ./cmd/viewer-headless
 	# macOS
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) -o $(DIST_DIR)/$(BROADCASTER_BINARY)-darwin-amd64 ./cmd/broadcaster
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) -o $(DIST_DIR)/$(VIEWER_BINARY)-darwin-amd64 ./cmd/viewer
+	GOOS=darwin GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-darwin-amd64 ./cmd/broadcaster-headless
+	GOOS=darwin GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-darwin-amd64 ./cmd/viewer-headless
 	# Linux
-	GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(DIST_DIR)/$(BROADCASTER_BINARY)-linux-amd64 ./cmd/broadcaster
-	GOOS=linux GOARCH=amd64 $(GOBUILD) -o $(DIST_DIR)/$(VIEWER_BINARY)-linux-amd64 ./cmd/viewer
+	GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-linux-amd64 ./cmd/broadcaster-headless
+	GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-linux-amd64 ./cmd/viewer-headless
 	# ARM (Raspberry Pi)
-	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -o $(DIST_DIR)/$(BROADCASTER_BINARY)-linux-arm7 ./cmd/broadcaster
-	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -o $(DIST_DIR)/$(VIEWER_BINARY)-linux-arm7 ./cmd/viewer
+	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-linux-arm7 ./cmd/broadcaster-headless
+	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-linux-arm7 ./cmd/viewer-headless
 
 # Run applications
 run-broadcaster: build
@@ -95,11 +101,18 @@ docker-dev-stop:
 docker-full-demo:
 	docker compose -f deployments/docker-compose.dev.yml up --build
 
-# Development
+# Development (headless)
 dev-broadcaster:
-	$(GOCMD) run ./cmd/broadcaster
+	$(GOCMD) run ./cmd/broadcaster-headless
 
 dev-viewer:
+	$(GOCMD) run ./cmd/viewer-headless
+
+# Development (GUI - requires X11/OpenGL)
+dev-broadcaster-gui:
+	$(GOCMD) run ./cmd/broadcaster
+
+dev-viewer-gui:
 	$(GOCMD) run ./cmd/viewer
 
 # Cleanup
