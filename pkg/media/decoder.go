@@ -27,8 +27,12 @@ func NewFFmpegDecoder(input io.ReadCloser, output io.WriteCloser) *FFmpegDecoder
 
 func (d *FFmpegDecoder) Start() error {
 	go func() {
-		defer d.output.Close()
-		
+		defer func() {
+			if err := d.output.Close(); err != nil {
+				log.Printf("Failed to close decoder output: %v", err)
+			}
+		}()
+
 		err := ffmpeg.Input("pipe:",
 			ffmpeg.KwArgs{
 				"format": "mjpeg",
@@ -39,15 +43,16 @@ func (d *FFmpegDecoder) Start() error {
 					"pix_fmt": "rgb24",
 					"s":       "640x480",
 				}).
+			WithContext(d.ctx).
 			WithInput(d.input).
 			WithOutput(d.output).
 			Run()
-		
+
 		if err != nil {
 			log.Printf("FFmpeg decode error: %v", err)
 		}
 	}()
-	
+
 	return nil
 }
 

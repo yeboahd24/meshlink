@@ -4,21 +4,20 @@ import (
 	"context"
 	"io"
 	"log"
+	"runtime"
 
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
 type FFmpegStreamer struct {
-	input  string
 	output io.WriteCloser
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-func NewFFmpegStreamer(input string, output io.WriteCloser) *FFmpegStreamer {
+func NewFFmpegStreamer(output io.WriteCloser) *FFmpegStreamer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &FFmpegStreamer{
-		input:  input,
 		output: output,
 		ctx:    ctx,
 		cancel: cancel,
@@ -28,43 +27,38 @@ func NewFFmpegStreamer(input string, output io.WriteCloser) *FFmpegStreamer {
 func (f *FFmpegStreamer) Start() error {
 	go func() {
 		defer f.output.Close()
-		
-		// Handle different input types
+
 		var stream *ffmpeg.Stream
-		if f.input == "testsrc=duration=3600:size=640x480:rate=30" {
-			// Use lavfi (libavfilter) for test pattern
-			log.Printf("Using FFmpeg test pattern")
-			stream = ffmpeg.Input(f.input, ffmpeg.KwArgs{"f": "lavfi"})
-		} else if f.input == "video=0" {
-			// Windows DirectShow camera
+
+		switch runtime.GOOS {
+		case "windows":
 			log.Printf("Using Windows DirectShow camera")
-			stream = ffmpeg.Input("video="+f.input, ffmpeg.KwArgs{"f": "dshow"})
-		} else if f.input == "0" {
-			// macOS AVFoundation camera
+			stream = ffmpeg.Input(`video=Integrated Camera`, ffmpeg.KwArgs{"f": "dshow"})
+		case "darwin":
 			log.Printf("Using macOS AVFoundation camera")
-			stream = ffmpeg.Input(f.input, ffmpeg.KwArgs{"f": "avfoundation"})
-		} else {
-			// Linux V4L2 camera
-			log.Printf("Using Linux V4L2 camera: %s", f.input)
-			stream = ffmpeg.Input(f.input, ffmpeg.KwArgs{"f": "v4l2"})
+			stream = ffmpeg.Input("0", ffmpeg.KwArgs{"f": "avfoundation"})
+		default:
+			log.Printf("Using Linux V4L2 camera")
+			stream = ffmpeg.Input("/dev/video0", ffmpeg.KwArgs{"f": "v4l2"})
 		}
-		
+
 		err := stream.
 			Output("pipe:",
 				ffmpeg.KwArgs{
-					"f":    "mjpeg",
-					"q:v":  "5",
-					"s":    "640x480",
-					"r":    "30",
+					"f":   "mjpeg",
+					"q:v": "5",
+					"s":   "640x480",
+					"r":   "30",
 				}).
+			WithContext(f.ctx).
 			WithOutput(f.output).
 			Run()
-		
+
 		if err != nil {
 			log.Printf("FFmpeg error: %v", err)
 		}
 	}()
-	
+
 	return nil
 }
 
