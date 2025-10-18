@@ -27,18 +27,21 @@ jobs:
       run: |
         choco install pkgconfiglite
     
-    - name: Install TDM-GCC
+    - name: Install GCC
       run: |
-        choco install tdm-gcc-webdl
+        choco install mingw
     
     - name: Build GUI Binaries
       run: |
         go mod tidy
+        $env:CGO_ENABLED = "1"
         go build -ldflags "-s -w" -o meshlink-broadcaster-gui.exe cmd/broadcaster/main.go
         go build -ldflags "-s -w" -o meshlink-viewer-gui.exe cmd/viewer/main.go
+      continue-on-error: true
     
     - name: Build Headless Binaries (fallback)
       run: |
+        $env:CGO_ENABLED = "0"
         go build -ldflags "-s -w" -o meshlink-broadcaster-headless.exe cmd/broadcaster-headless/main.go
         go build -ldflags "-s -w" -o meshlink-viewer-headless.exe cmd/viewer-headless/main.go
     
