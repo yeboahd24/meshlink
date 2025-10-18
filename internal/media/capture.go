@@ -41,8 +41,11 @@ func (c *CameraCapture) StartWithOutput(output io.WriteCloser) error {
 	}
 	
 	c.output = output
-	input := c.getCameraInput()
-	c.streamer = media.NewFFmpegStreamer(input, output)
+	// Log camera detection
+	_ = c.getCameraInput()
+	
+	// Create streamer (it will auto-detect camera)
+	c.streamer = media.NewFFmpegStreamer(output)
 	
 	if err := c.streamer.Start(); err != nil {
 		return fmt.Errorf("failed to start FFmpeg: %v", err)
