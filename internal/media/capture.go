@@ -74,16 +74,22 @@ func (c *CameraCapture) getCameraInput() string {
 	case "linux":
 		// Try real camera first, fallback to test pattern
 		if _, err := os.Stat("/dev/video0"); err == nil {
+			fmt.Println("Camera: Real camera detected at /dev/video0")
 			return "/dev/video0"
 		}
 		// Use FFmpeg test pattern for Docker
-		return "testsrc=duration=3600:size=1280x720:rate=30"
+		fmt.Println("Camera: No camera found - using test pattern")
+		return "testsrc=duration=3600:size=640x480:rate=30"
 	case "windows":
-		return "0"
+		// Windows needs DirectShow format - try default camera
+		fmt.Println("Camera: Attempting to use Windows camera (video=0)")
+		return "video=0"
 	case "darwin":
+		fmt.Println("Camera: Attempting to use macOS camera (0)")
 		return "0"
 	default:
-		return "testsrc=duration=3600:size=1280x720:rate=30"
+		fmt.Println("Camera: Using test pattern fallback")
+		return "testsrc=duration=3600:size=640x480:rate=30"
 	}
 }
 

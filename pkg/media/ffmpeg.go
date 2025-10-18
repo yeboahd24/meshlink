@@ -29,13 +29,23 @@ func (f *FFmpegStreamer) Start() error {
 	go func() {
 		defer f.output.Close()
 		
-		// Handle test pattern input differently
+		// Handle different input types
 		var stream *ffmpeg.Stream
-		if f.input == "testsrc=duration=3600:size=1280x720:rate=30" {
+		if f.input == "testsrc=duration=3600:size=640x480:rate=30" {
 			// Use lavfi (libavfilter) for test pattern
+			log.Printf("Using FFmpeg test pattern")
 			stream = ffmpeg.Input(f.input, ffmpeg.KwArgs{"f": "lavfi"})
+		} else if f.input == "video=0" {
+			// Windows DirectShow camera
+			log.Printf("Using Windows DirectShow camera")
+			stream = ffmpeg.Input("video="+f.input, ffmpeg.KwArgs{"f": "dshow"})
+		} else if f.input == "0" {
+			// macOS AVFoundation camera
+			log.Printf("Using macOS AVFoundation camera")
+			stream = ffmpeg.Input(f.input, ffmpeg.KwArgs{"f": "avfoundation"})
 		} else {
-			// Regular camera input
+			// Linux V4L2 camera
+			log.Printf("Using Linux V4L2 camera: %s", f.input)
 			stream = ffmpeg.Input(f.input, ffmpeg.KwArgs{"f": "v4l2"})
 		}
 		
