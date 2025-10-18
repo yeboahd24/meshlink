@@ -42,12 +42,9 @@ func (f *FFmpegStreamer) Start() error {
 		err := stream.
 			Output("pipe:",
 				ffmpeg.KwArgs{
-					"format":  "h264",
-					"vcodec":  "libx264",
-					"preset":  "ultrafast",
-					"tune":    "zerolatency",
-					"crf":     "23",
-					"s":       "1280x720",
+					"format":  "rawvideo",
+					"pix_fmt": "rgb24",
+					"s":       "640x480",
 					"r":       "30",
 				}).
 			WithOutput(f.output).
