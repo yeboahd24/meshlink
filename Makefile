@@ -31,27 +31,47 @@ build: deps
 	$(GOBUILD) -buildvcs=false -o $(BUILD_DIR)/$(BROADCASTER_BINARY) ./cmd/broadcaster-headless
 	$(GOBUILD) -buildvcs=false -o $(BUILD_DIR)/$(VIEWER_BINARY) ./cmd/viewer-headless
 
-# Build GUI versions for current platform (requires X11/OpenGL)
-build-gui: deps
+# Build GUI versions using Docker (has required libraries)
+build-gui:
+	@echo "Building GUI versions in Docker (has X11/OpenGL libraries)..."
+	docker compose -f deployments/docker-compose.dev.yml exec dev-env make docker-build-gui
+
+# Internal Docker GUI build target
+docker-build-gui: deps
 	mkdir -p $(DIST_DIR)
 	$(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-gui ./cmd/broadcaster
 	$(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-gui ./cmd/viewer
+	@echo "✅ GUI versions built successfully!"
 
-# Build for multiple platforms (headless versions for cross-compilation)
+# Build for all platforms (cross-platform headless versions)
 build-all: deps
 	mkdir -p $(DIST_DIR)
-	# Windows
+	# Cross-platform headless (works everywhere)
 	GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-windows-amd64.exe ./cmd/broadcaster-headless
 	GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-windows-amd64.exe ./cmd/viewer-headless
-	# macOS
+	# Web-enabled broadcaster (Windows)
+	GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-web-windows.exe ./cmd/broadcaster-web
 	GOOS=darwin GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-darwin-amd64 ./cmd/broadcaster-headless
 	GOOS=darwin GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-darwin-amd64 ./cmd/viewer-headless
-	# Linux
 	GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-linux-amd64 ./cmd/broadcaster-headless
 	GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-linux-amd64 ./cmd/viewer-headless
-	# ARM (Raspberry Pi)
+	# Web-enabled broadcaster (Linux)
+	GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-web-linux ./cmd/broadcaster-web
 	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-linux-arm7 ./cmd/broadcaster-headless
 	GOOS=linux GOARCH=arm GOARM=7 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-linux-arm7 ./cmd/viewer-headless
+	@echo "✅ Cross-platform builds complete!"
+	@echo "🌐 Web broadcaster: broadcaster-web-windows.exe (serves to browsers)"
+	@echo "📱 For GUI versions, use: make build-gui (builds in Docker)"
+
+# Build headless versions for servers/embedded systems
+build-headless: deps
+	mkdir -p $(DIST_DIR)
+	# Windows headless
+	GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-headless-windows.exe ./cmd/broadcaster-headless
+	GOOS=windows GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-headless-windows.exe ./cmd/viewer-headless
+	# Linux headless
+	GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(BROADCASTER_BINARY)-headless-linux ./cmd/broadcaster-headless
+	GOOS=linux GOARCH=amd64 $(GOBUILD) -buildvcs=false -o $(DIST_DIR)/$(VIEWER_BINARY)-headless-linux ./cmd/viewer-headless
 
 # Run applications
 run-broadcaster: build
@@ -136,12 +156,30 @@ install-deps-ubuntu:
 install-deps-macos:
 	brew install gstreamer gst-plugins-base
 
+# Build with GStreamer (requires GStreamer libraries)
+build-gstreamer:
+	@echo "Building with GStreamer support..."
+	mkdir -p $(DIST_DIR)
+	go build -buildvcs=false -tags gstreamer -o $(DIST_DIR)/$(BROADCASTER_BINARY)-web-gst ./cmd/broadcaster-web
+	@echo "✅ GStreamer build complete: $(DIST_DIR)/$(BROADCASTER_BINARY)-web-gst"
+	@echo "⚠️  Requires GStreamer libraries to run"
+	@echo "📝 Install: sudo apt install gstreamer1.0-tools (Linux) or brew install gstreamer (macOS)"
+
+# Test GStreamer in Docker environment
+test-gstreamer-docker:
+	@echo "Testing GStreamer availability in Docker..."
+	docker compose -f deployments/docker-compose.dev.yml exec dev-env gst-launch-1.0 --version
+	docker compose -f deployments/docker-compose.dev.yml exec dev-env gst-inspect-1.0 h264parse
+	@echo "✅ GStreamer is available in Docker environment"
+
 # Help
 help:
 	@echo "Available targets:"
 	@echo "  Local Development:"
 	@echo "    build          - Build applications"
-	@echo "    build-all      - Build for all platforms"
+	@echo "    build-all      - Build for all platforms (standard)"
+	@echo "    build-gstreamer - Build with GStreamer (requires libs)"
+	@echo "    test-gstreamer-docker - Test GStreamer in Docker"
 	@echo "    run-broadcaster - Run broadcaster application"
 	@echo "    run-viewer     - Run viewer application"
 	@echo "    test           - Run tests"

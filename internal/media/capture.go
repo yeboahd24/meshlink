@@ -26,8 +26,13 @@ func (c *CameraCapture) Start() error {
 		return fmt.Errorf("already capturing")
 	}
 	
-	// Always start in simulation mode for now (real camera integration coming soon)
-	fmt.Println("Camera: Starting in simulation mode (generating test frames)")
+	// Try real camera first, fallback to simulation
+	if c.isCameraAvailable() {
+		fmt.Println("Camera: Real camera detected - starting capture")
+	} else {
+		fmt.Println("Camera: No camera found - using simulation mode")
+	}
+	
 	c.isCapturing = true
 	return nil
 }
@@ -41,7 +46,15 @@ func (c *CameraCapture) CaptureFrame() ([]byte, error) {
 		return nil, fmt.Errorf("not capturing")
 	}
 	
-	// Generate simulation frame (real camera integration coming soon)
+	// Try real camera capture first
+	if c.isCameraAvailable() {
+		frameData, err := c.captureFromSystem()
+		if err == nil && len(frameData) > 0 {
+			return frameData, nil
+		}
+	}
+	
+	// Fallback to simulation
 	return c.generateFallbackFrame(), nil
 }
 

@@ -23,6 +23,7 @@ type Broadcaster struct {
 	frameCount  uint64
 	stopChan    chan struct{}
 	camera      *media.CameraCapture
+	audio       *media.AudioCapture
 	encoder     *media.H264Encoder
 	quality     string
 }
@@ -52,6 +53,7 @@ func NewBroadcasterWithConfig(ctx context.Context, ps *pubsub.PubSub, cfg *confi
 
 	// Initialize media components with config
 	camera := media.NewCameraCapture()
+	audio := media.NewAudioCapture()
 	encoder := media.NewH264Encoder(quality)
 
 	return &Broadcaster{
@@ -60,6 +62,7 @@ func NewBroadcasterWithConfig(ctx context.Context, ps *pubsub.PubSub, cfg *confi
 		ctx:      ctx,
 		stopChan: make(chan struct{}),
 		camera:   camera,
+		audio:    audio,
 		encoder:  encoder,
 		quality:  quality,
 	}, nil
@@ -84,6 +87,12 @@ func (b *Broadcaster) StartStreaming() error {
 	// Start camera capture
 	if err := b.camera.Start(); err != nil {
 		return fmt.Errorf("failed to start camera: %w", err)
+	}
+	
+	// Start audio capture
+	if err := b.audio.Start(); err != nil {
+		b.camera.Stop()
+		return fmt.Errorf("failed to start audio: %w", err)
 	}
 	
 	// Start encoder
@@ -179,6 +188,7 @@ func (b *Broadcaster) Stop() {
 	// Stop media components
 	b.encoder.Stop()
 	b.camera.Stop()
+	b.audio.Stop()
 	
 	// Signal stop to streaming loop
 	select {
@@ -198,6 +208,26 @@ func (b *Broadcaster) GetViewerCount() int {
 	peers := b.topic.ListPeers()
 	b.viewerCount = len(peers)
 	return b.viewerCount
+}
+
+func (b *Broadcaster) GetCurrentFrame() []byte {
+	if !b.isStreaming {
+		return nil
+	}
+	
+	// Capture current frame from camera
+	rawFrame, err := b.camera.CaptureFrame()
+	if err != nil {
+		return nil
+	}
+	
+	// Encode frame with H.264
+	frameData, err := b.encoder.EncodeFrame(rawFrame, b.frameCount+1)
+	if err != nil {
+		return nil
+	}
+	
+	return frameData
 }
 
 func (b *Broadcaster) UpdateViewerCount() {

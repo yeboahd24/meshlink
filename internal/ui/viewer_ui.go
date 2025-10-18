@@ -15,7 +15,8 @@ type ViewerUI struct {
 	window      fyne.Window
 	statusText  *widget.Label
 	connectBtn  *widget.Button
-	videoArea   *widget.Card
+	videoWidget *VideoWidget
+	videoCard   *widget.Card
 	statsLabel  *widget.Label
 	onConnect   func() error
 	onDisconnect func()
@@ -65,10 +66,10 @@ func (ui *ViewerUI) setupUI() {
 		}
 	})
 
-	ui.videoArea = widget.NewCard("Video Stream", "Waiting for connection...", 
-		widget.NewLabel("📺 Video stream will appear here\n\nResolution: 1280x720\nCodec: H.264\nBitrate: 2000 kbps"),
-	)
-	ui.videoArea.Resize(fyne.NewSize(640, 480))
+	// Create video widget
+	ui.videoWidget = NewVideoWidget(640, 480)
+	ui.videoCard = widget.NewCard("Video Stream", "Waiting for connection...", ui.videoWidget)
+	ui.videoCard.Resize(fyne.NewSize(660, 500))
 
 	ui.statsLabel = widget.NewLabel("Statistics: Not connected")
 	ui.statsLabel.Alignment = fyne.TextAlignCenter
@@ -84,7 +85,7 @@ func (ui *ViewerUI) setupUI() {
 	content := container.NewBorder(
 		topControls,
 		nil, nil, nil,
-		ui.videoArea,
+		ui.videoCard,
 	)
 
 	ui.window.SetContent(content)
@@ -94,13 +95,12 @@ func (ui *ViewerUI) updateUI() {
 	if ui.isConnected {
 		ui.statusText.SetText("🔴 Connected - Receiving Stream")
 		ui.connectBtn.SetText("Disconnect")
-		ui.videoArea.SetSubTitle("Stream active - receiving data")
+		ui.videoCard.SetSubTitle("🔴 LIVE - Receiving HD Stream")
 		ui.statsLabel.SetText("Statistics: Connected - waiting for data...")
 	} else {
 		ui.statusText.SetText("⚪ Searching for broadcasts...")
 		ui.connectBtn.SetText("Connect to Stream")
-		ui.videoArea.SetSubTitle("Waiting for connection...")
-		ui.videoArea.SetContent(widget.NewLabel("📺 Video stream will appear here\n\nResolution: 1280x720\nCodec: H.264\nBitrate: 2000 kbps"))
+		ui.videoCard.SetSubTitle("Waiting for connection...")
 		ui.statsLabel.SetText("Statistics: Not connected")
 	}
 }
@@ -126,16 +126,12 @@ func (ui *ViewerUI) UpdateVideoFrame(data []byte) {
 	animation := []string{"🔴", "🟠", "🟡", "🟢", "🔵", "🟣"}
 	frameIndicator := animation[ui.framesReceived%uint64(len(animation))]
 	
-	// Enhanced video display with live indicators
-	frameInfo := fmt.Sprintf("%s LIVE STREAM %s\n\n📺 Video: 720p H.264\n🎵 Audio: AAC Stereo\n📊 Frame #%d\n📦 Size: %d bytes\n💾 Total: %.2f MB\n⏱️ Time: %s", 
-		frameIndicator, frameIndicator,
-		ui.framesReceived, 
-		len(data), 
-		float64(ui.bytesReceived)/(1024*1024),
-		time.Now().Format("15:04:05"))
+	// Update video widget with actual frame data
+	ui.videoWidget.UpdateFrame(data)
 	
-	ui.videoArea.SetContent(widget.NewLabel(frameInfo))
-	ui.videoArea.SetSubTitle("🔴 LIVE - Receiving HD Stream")
+	// Update card subtitle with live indicator
+	ui.videoCard.SetSubTitle(fmt.Sprintf("%s LIVE - Frame #%d - %d bytes %s", 
+		frameIndicator, ui.framesReceived, len(data), frameIndicator))
 
 	// Enhanced statistics with bitrate calculation
 	elapsed := time.Duration(ui.framesReceived) * 33 * time.Millisecond // 30fps timing
