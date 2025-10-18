@@ -2,7 +2,6 @@ package media
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"os/exec"
