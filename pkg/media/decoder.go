@@ -31,12 +31,13 @@ func (d *FFmpegDecoder) Start() error {
 		
 		err := ffmpeg.Input("pipe:",
 			ffmpeg.KwArgs{
-				"format": "h264",
+				"format": "mjpeg",
 			}).
 			Output("pipe:",
 				ffmpeg.KwArgs{
 					"format":  "rawvideo",
 					"pix_fmt": "rgb24",
+					"s":       "640x480",
 				}).
 			WithInput(d.input).
 			WithOutput(d.output).

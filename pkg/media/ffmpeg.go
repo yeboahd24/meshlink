@@ -42,10 +42,10 @@ func (f *FFmpegStreamer) Start() error {
 		err := stream.
 			Output("pipe:",
 				ffmpeg.KwArgs{
-					"format":  "rawvideo",
-					"pix_fmt": "rgb24",
-					"s":       "640x480",
-					"r":       "30",
+					"f":    "mjpeg",
+					"q:v":  "5",
+					"s":    "640x480",
+					"r":    "30",
 				}).
 			WithOutput(f.output).
 			Run()
