@@ -50,7 +50,6 @@ func (f *FFmpegStreamer) Start() error {
 					"s":   "640x480",
 					"r":   "30",
 				}).
-			WithContext(f.ctx).
 			WithOutput(f.output).
 			Run()
 

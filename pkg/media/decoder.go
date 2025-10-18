@@ -43,7 +43,6 @@ func (d *FFmpegDecoder) Start() error {
 					"pix_fmt": "rgb24",
 					"s":       "640x480",
 				}).
-			WithContext(d.ctx).
 			WithInput(d.input).
 			WithOutput(d.output).
 			Run()
