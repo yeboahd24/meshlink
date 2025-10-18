@@ -1,13 +1,14 @@
 package ui
 
 import (
+	"bytes"
 	"image"
 	"image/color"
+	"image/jpeg"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
-	"meshlink/internal/media"
 )
 
 type VideoWidget struct {
@@ -42,14 +43,10 @@ func (v *VideoWidget) CreateRenderer() fyne.WidgetRenderer {
 func (v *VideoWidget) UpdateFrame(data []byte) {
 	v.frameNum++
 	
-	// Try to decode the frame for better visuals
-	decoder := media.NewH264Decoder()
-	decoder.Start()
-	
-	decodedFrame, err := decoder.DecodeFrame(data)
+	// Try to decode MJPEG frame
+	img, err := v.decodeMJPEG(data)
 	if err == nil {
-		// Use decoded frame data
-		img := v.createDecodedFrame(decodedFrame)
+		// Successfully decoded JPEG
 		v.image.Image = img
 	} else {
 		// Fallback to animated pattern
@@ -58,7 +55,16 @@ func (v *VideoWidget) UpdateFrame(data []byte) {
 	}
 	
 	v.image.Refresh()
-	decoder.Stop()
+}
+
+func (v *VideoWidget) decodeMJPEG(data []byte) (image.Image, error) {
+	// Decode JPEG image from bytes
+	reader := bytes.NewReader(data)
+	img, err := jpeg.Decode(reader)
+	if err != nil {
+		return nil, err
+	}
+	return img, nil
 }
 
 func (v *VideoWidget) createPlaceholder() image.Image {
@@ -75,36 +81,7 @@ func (v *VideoWidget) createPlaceholder() image.Image {
 	return img
 }
 
-func (v *VideoWidget) createDecodedFrame(frame *media.DecodedFrame) image.Image {
-	img := image.NewRGBA(image.Rect(0, 0, v.width, v.height))
-	
-	// Use actual decoded frame data for more realistic video
-	frameData := frame.Data
-	dataHash := 0
-	for _, b := range frameData[:min(len(frameData), 1000)] {
-		dataHash += int(b)
-	}
-	
-	// Create video-like pattern based on actual H.264 data
-	for y := 0; y < v.height; y++ {
-		for x := 0; x < v.width; x++ {
-			// Use frame data to create realistic video patterns
-			idx := (y*v.width + x) % len(frameData)
-			baseColor := frameData[idx]
-			
-			// Create RGB from H.264 data
-			r := uint8((int(baseColor) + x + dataHash) % 256)
-			g := uint8((int(baseColor) + y + dataHash/2) % 256)
-			b := uint8((int(baseColor) + x + y) % 256)
-			
-			img.Set(x, y, color.RGBA{r, g, b, 255})
-		}
-	}
-	
-	// Add frame info overlay
-	v.drawDecodedFrameInfo(img, frame)
-	return img
-}
+
 
 func (v *VideoWidget) createAnimatedFrame(data []byte) image.Image {
 	img := image.NewRGBA(image.Rect(0, 0, v.width, v.height))
@@ -135,32 +112,7 @@ func (v *VideoWidget) createAnimatedFrame(data []byte) image.Image {
 	return img
 }
 
-func (v *VideoWidget) drawDecodedFrameInfo(img *image.RGBA, frame *media.DecodedFrame) {
-	// Draw quality indicator
-	barHeight := 30
-	quality := frame.GetQuality()
-	
-	// Color based on quality
-	var barColor color.RGBA
-	switch quality {
-	case "720p":
-		barColor = color.RGBA{0, 255, 0, 255} // Green for 720p
-	case "1080p":
-		barColor = color.RGBA{0, 0, 255, 255} // Blue for 1080p
-	default:
-		barColor = color.RGBA{255, 255, 0, 255} // Yellow for others
-	}
-	
-	// Draw quality bar
-	for y := 0; y < barHeight; y++ {
-		for x := 0; x < v.width/3; x++ {
-			img.Set(x, y, barColor)
-		}
-	}
-	
-	// Draw frame ID indicator
-	v.drawFrameInfo(img, frame.Data)
-}
+
 
 func (v *VideoWidget) drawFrameInfo(img *image.RGBA, data []byte) {
 	// Draw frame number as colored bars
