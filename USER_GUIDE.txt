@@ -1,0 +1,41 @@
+MeshLink - Church Streaming (No Internet Required)
+
+=== CHURCH STAFF (BROADCASTER) ===
+
+1. Copy "meshlink-broadcaster.exe" to your laptop
+2. Double-click to run
+3. Streaming starts automatically using your camera
+4. Share your WiFi network name with congregation
+5. Press Ctrl+C to stop
+
+=== CONGREGATION (VIEWERS) ===
+
+1. Copy "meshlink-viewer.exe" to your laptop
+2. Connect to the church WiFi network
+3. Double-click to run
+4. Video stream appears automatically
+5. Press Ctrl+C to stop
+
+=== REQUIREMENTS ===
+
+- Windows computer (any version)
+- WiFi connection (same network)
+- No internet required
+- No installation required
+
+=== TROUBLESHOOTING ===
+
+Problem: "Can't find stream"
+Solution: Make sure both devices are on same WiFi
+
+Problem: "No camera found" 
+Solution: Broadcaster will use test pattern automatically
+
+Problem: "Permission denied"
+Solution: Right-click exe → "Run as administrator"
+
+=== SUPPORT ===
+
+This is a portable application - no installation needed.
+Just copy the .exe files and run them.
+Works offline on local WiFi networks.

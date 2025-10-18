@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/meshlink/church-streaming/internal/config"
-	"github.com/meshlink/church-streaming/internal/p2p"
-	"github.com/meshlink/church-streaming/internal/web"
-	"github.com/meshlink/church-streaming/pkg/streaming"
+	"meshlink/internal/config"
+	"meshlink/internal/p2p"
+	"meshlink/internal/web"
+	"meshlink/pkg/streaming"
 )
 
 func main() {

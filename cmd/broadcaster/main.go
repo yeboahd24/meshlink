@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/meshlink/church-streaming/internal/config"
-	"github.com/meshlink/church-streaming/internal/p2p"
-	"github.com/meshlink/church-streaming/internal/ui"
-	"github.com/meshlink/church-streaming/pkg/streaming"
+	"meshlink/internal/config"
+	"meshlink/internal/p2p"
+	"meshlink/internal/ui"
+	"meshlink/pkg/streaming"
 )
 
 func main() {

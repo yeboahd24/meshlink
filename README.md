@@ -21,17 +21,17 @@ Enable churches to stream services without internet dependency, using local WiFi
 
 ### Data Flow Process
 ```
-Camera → H.264 Encode → P2P Publish → P2P Receive → H.264 Decode → Display
+Camera → FFmpeg H.264 Encode → P2P Publish → P2P Receive → FFmpeg H.264 Decode → Display
 ```
 
 ### Step-by-Step Transmission
-1. **Camera Capture**: System camera captures raw video frames
-2. **H.264 Encoding**: Compress frames to ~50KB each (720p quality)
+1. **Camera Capture**: FFmpeg captures from system camera
+2. **H.264 Encoding**: FFmpeg compresses to ~50KB frames (720p quality)
 3. **P2P Discovery**: mDNS finds peers on local WiFi network automatically
 4. **Topic Publishing**: Broadcaster publishes frames to "meshlink/church/stream" topic
 5. **Mesh Distribution**: libp2p distributes frames to all subscribed viewers
 6. **Frame Reception**: Viewers receive encrypted frames via direct P2P connections
-7. **H.264 Decoding**: Decompress frames back to video data
+7. **H.264 Decoding**: FFmpeg decompresses frames back to video data
 8. **Display**: Render 30 FPS video stream in real-time
 
 ### Network Architecture
@@ -186,6 +186,6 @@ Microsoft Store / Mac App Store:
 ## 🛠️ Technology Stack
 - **Backend**: Go 1.21+
 - **P2P**: libp2p
-- **Media**: GStreamer integration
+- **Media**: FFmpeg integration
 - **UI**: Fyne (cross-platform)
 - **Deployment**: Docker, Kubernetes ready

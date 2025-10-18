@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  broadcaster:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8080:8080"
+    networks:
+      - meshlink
+    environment:
+      - DISPLAY_MODE=headless
+    stdin_open: true
+    tty: true
+
+  viewer1:
+    build:
+      context: .
+      dockerfile: Dockerfile.viewer
+    ports:
+      - "8081:8080"
+    networks:
+      - meshlink
+    environment:
+      - DISPLAY_MODE=headless
+    depends_on:
+      - broadcaster
+    stdin_open: true
+    tty: true
+
+  viewer2:
+    build:
+      context: .
+      dockerfile: Dockerfile.viewer
+    ports:
+      - "8082:8080"
+    networks:
+      - meshlink
+    environment:
+      - DISPLAY_MODE=headless
+    depends_on:
+      - broadcaster
+    stdin_open: true
+    tty: true
+
+networks:
+  meshlink:
+    driver: bridge

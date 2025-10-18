@@ -1,0 +1,111 @@
+name: Build MeshLink Binaries
+
+on:
+  push:
+    branches: [ main, master, development ]
+  pull_request:
+    branches: [ main, master, development ]
+  release:
+    types: [ created ]
+
+jobs:
+  build-windows-gui:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install FFmpeg
+      run: |
+        choco install ffmpeg
+    
+    - name: Install pkg-config
+      run: |
+        choco install pkgconfiglite
+    
+    - name: Install TDM-GCC
+      run: |
+        choco install tdm-gcc-webdl
+    
+    - name: Build GUI Binaries
+      run: |
+        go mod tidy
+        go build -ldflags "-s -w" -o meshlink-broadcaster-gui.exe cmd/broadcaster/main.go
+        go build -ldflags "-s -w" -o meshlink-viewer-gui.exe cmd/viewer/main.go
+    
+    - name: Build Headless Binaries (fallback)
+      run: |
+        go build -ldflags "-s -w" -o meshlink-broadcaster-headless.exe cmd/broadcaster-headless/main.go
+        go build -ldflags "-s -w" -o meshlink-viewer-headless.exe cmd/viewer-headless/main.go
+    
+    - name: Upload Windows Binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: meshlink-windows-binaries
+        path: |
+          meshlink-broadcaster-gui.exe
+          meshlink-viewer-gui.exe
+          meshlink-broadcaster-headless.exe
+          meshlink-viewer-headless.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libgl1-mesa-dev libxrandr-dev libxcursor-dev libxinerama-dev libxi-dev libglfw3-dev ffmpeg
+    
+    - name: Build Linux GUI
+      run: |
+        go mod tidy
+        go build -ldflags "-s -w" -o meshlink-broadcaster-linux cmd/broadcaster/main.go
+        go build -ldflags "-s -w" -o meshlink-viewer-linux cmd/viewer/main.go
+    
+    - name: Upload Linux Binaries
+      uses: actions/upload-artifact@v3
+      with:
+        name: meshlink-linux-binaries
+        path: |
+          meshlink-broadcaster-linux
+          meshlink-viewer-linux
+
+  create-release:
+    if: github.event_name == 'release'
+    needs: [build-windows-gui, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download Windows Binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: meshlink-windows-binaries
+        path: ./windows/
+    
+    - name: Download Linux Binaries
+      uses: actions/download-artifact@v3
+      with:
+        name: meshlink-linux-binaries
+        path: ./linux/
+    
+    - name: Create ZIP packages
+      run: |
+        cd windows && zip -r ../meshlink-windows.zip . && cd ..
+        cd linux && tar -czf ../meshlink-linux.tar.gz . && cd ..
+    
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          meshlink-windows.zip
+          meshlink-linux.tar.gz

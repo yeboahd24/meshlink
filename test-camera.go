@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/meshlink/church-streaming/internal/media"
+	"meshlink/internal/media"
 )
 
 func main() {

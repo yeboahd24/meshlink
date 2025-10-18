@@ -1,0 +1,13 @@
+FROM golang:1.21-alpine
+
+# Install FFmpeg
+RUN apk add --no-cache ffmpeg
+
+WORKDIR /app
+COPY test-ffmpeg-simple.go .
+
+# Build the test
+RUN go build -o ffmpeg-test test-ffmpeg-simple.go
+
+# Run the test
+CMD ["./ffmpeg-test"]

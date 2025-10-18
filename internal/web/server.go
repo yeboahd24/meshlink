@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
-	"github.com/meshlink/church-streaming/internal/media"
+	"meshlink/internal/media"
 )
 
 type WebServer struct {

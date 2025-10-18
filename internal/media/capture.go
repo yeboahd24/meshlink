@@ -2,8 +2,11 @@ package media
 
 import (
 	"fmt"
-	"os/exec"
+	"io"
+	"os"
 	"runtime"
+
+	"meshlink/pkg/media"
 )
 
 type CameraCapture struct {
@@ -11,6 +14,8 @@ type CameraCapture struct {
 	resolution string
 	fps        int
 	isCapturing bool
+	streamer   *media.FFmpegStreamer
+	output     io.WriteCloser
 }
 
 func NewCameraCapture() *CameraCapture {
@@ -26,11 +31,21 @@ func (c *CameraCapture) Start() error {
 		return fmt.Errorf("already capturing")
 	}
 	
-	// Try real camera first, fallback to simulation
-	if c.isCameraAvailable() {
-		fmt.Println("Camera: Real camera detected - starting capture")
-	} else {
-		fmt.Println("Camera: No camera found - using simulation mode")
+	c.isCapturing = true
+	return nil
+}
+
+func (c *CameraCapture) StartWithOutput(output io.WriteCloser) error {
+	if c.isCapturing {
+		return fmt.Errorf("already capturing")
+	}
+	
+	c.output = output
+	input := c.getCameraInput()
+	c.streamer = media.NewFFmpegStreamer(input, output)
+	
+	if err := c.streamer.Start(); err != nil {
+		return fmt.Errorf("failed to start FFmpeg: %v", err)
 	}
 	
 	c.isCapturing = true
@@ -38,6 +53,9 @@ func (c *CameraCapture) Start() error {
 }
 
 func (c *CameraCapture) Stop() {
+	if c.streamer != nil {
+		c.streamer.Stop()
+	}
 	c.isCapturing = false
 }
 
@@ -46,110 +64,30 @@ func (c *CameraCapture) CaptureFrame() ([]byte, error) {
 		return nil, fmt.Errorf("not capturing")
 	}
 	
-	// Try real camera capture first
-	if c.isCameraAvailable() {
-		frameData, err := c.captureFromSystem()
-		if err == nil && len(frameData) > 0 {
-			return frameData, nil
-		}
-	}
-	
-	// Fallback to simulation
+	// Generate fallback frame for Docker/headless mode
 	return c.generateFallbackFrame(), nil
 }
 
-func (c *CameraCapture) isCameraAvailable() bool {
+func (c *CameraCapture) getCameraInput() string {
+	// For Docker/Linux environment, use test pattern if no camera
 	switch runtime.GOOS {
-	case "windows":
-		// Check Windows camera
-		cmd := exec.Command("powershell", "-Command", "Get-PnpDevice -Class Camera | Where-Object {$_.Status -eq 'OK'}")
-		return cmd.Run() == nil
-	case "darwin":
-		// Check macOS camera
-		cmd := exec.Command("system_profiler", "SPCameraDataType")
-		return cmd.Run() == nil
 	case "linux":
-		// Check Linux camera
-		cmd := exec.Command("ls", "/dev/video0")
-		return cmd.Run() == nil
-	default:
-		return false
-	}
-}
-
-func (c *CameraCapture) captureFromSystem() ([]byte, error) {
-	// Capture actual frame from system camera
-	switch runtime.GOOS {
+		// Try real camera first, fallback to test pattern
+		if _, err := os.Stat("/dev/video0"); err == nil {
+			return "/dev/video0"
+		}
+		// Use FFmpeg test pattern for Docker
+		return "testsrc=duration=3600:size=1280x720:rate=30"
 	case "windows":
-		return c.captureWindows()
+		return "0"
 	case "darwin":
-		return c.captureMacOS()
-	case "linux":
-		return c.captureLinux()
+		return "0"
 	default:
-		return nil, fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+		return "testsrc=duration=3600:size=1280x720:rate=30"
 	}
 }
 
-func (c *CameraCapture) captureWindows() ([]byte, error) {
-	// Use ffmpeg to capture from DirectShow camera
-	cmd := exec.Command("ffmpeg", 
-		"-f", "dshow",
-		"-i", fmt.Sprintf("video=USB2.0 PC CAMERA:audio=Microphone (USB2.0 MIC)"),
-		"-vframes", "1",
-		"-f", "rawvideo",
-		"-pix_fmt", "yuv420p",
-		"-s", c.resolution,
-		"-")
-	
-	output, err := cmd.Output()
-	if err != nil {
-		// Fallback to synthetic data if camera unavailable
-		return c.generateFallbackFrame(), nil
-	}
-	
-	return output, nil
-}
 
-func (c *CameraCapture) captureMacOS() ([]byte, error) {
-	// Use ffmpeg to capture from AVFoundation
-	cmd := exec.Command("ffmpeg",
-		"-f", "avfoundation",
-		"-i", "0", // Default camera
-		"-vframes", "1",
-		"-f", "rawvideo",
-		"-pix_fmt", "yuv420p",
-		"-s", c.resolution,
-		"-")
-	
-	output, err := cmd.Output()
-	if err != nil {
-		// Fallback to synthetic data if camera unavailable
-		return c.generateFallbackFrame(), nil
-	}
-	
-	return output, nil
-}
-
-func (c *CameraCapture) captureLinux() ([]byte, error) {
-	// Use ffmpeg to capture from Video4Linux
-	cmd := exec.Command("ffmpeg",
-		"-f", "v4l2",
-		"-i", "/dev/video0",
-		"-vframes", "1",
-		"-f", "rawvideo",
-		"-pix_fmt", "yuv420p",
-		"-s", c.resolution,
-		"-")
-	
-	output, err := cmd.Output()
-	if err != nil {
-		// Fallback to synthetic data if camera unavailable
-		return c.generateFallbackFrame(), nil
-	}
-	
-	return output, nil
-}
 
 func (c *CameraCapture) generateFallbackFrame() []byte {
 	// Generate fallback frame when camera is unavailable

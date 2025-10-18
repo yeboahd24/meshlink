@@ -7,7 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/widget"
-	"github.com/meshlink/church-streaming/internal/media"
+	"meshlink/internal/media"
 )
 
 type VideoWidget struct {

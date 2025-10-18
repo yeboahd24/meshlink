@@ -1,0 +1,19 @@
+FROM golang:1.21-alpine AS builder
+
+# Install FFmpeg and build dependencies
+RUN apk add --no-cache ffmpeg ffmpeg-dev pkgconfig gcc musl-dev
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+RUN go build -o broadcaster-simple cmd/broadcaster-simple/main.go
+
+FROM alpine:latest
+RUN apk add --no-cache ffmpeg
+WORKDIR /app
+COPY --from=builder /app/broadcaster-simple .
+
+EXPOSE 8080
+CMD ["./broadcaster-simple"]

@@ -7,8 +7,8 @@ import (
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/sirupsen/logrus"
-	"github.com/meshlink/church-streaming/internal/config"
-	"github.com/meshlink/church-streaming/internal/media"
+	"meshlink/internal/config"
+	"meshlink/internal/media"
 )
 
 const StreamTopic = "meshlink/church/stream"
