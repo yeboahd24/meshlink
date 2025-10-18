@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"os/exec"
 
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
@@ -13,6 +14,7 @@ type FFmpegDecoder struct {
 	output io.WriteCloser
 	ctx    context.Context
 	cancel context.CancelFunc
+	cmd    *exec.Cmd
 }
 
 func NewFFmpegDecoder(input io.ReadCloser, output io.WriteCloser) *FFmpegDecoder {
@@ -26,35 +28,69 @@ func NewFFmpegDecoder(input io.ReadCloser, output io.WriteCloser) *FFmpegDecoder
 }
 
 func (d *FFmpegDecoder) Start() error {
+	errChan := make(chan error, 1)
+
 	go func() {
 		defer func() {
 			if err := d.output.Close(); err != nil {
 				log.Printf("Failed to close decoder output: %v", err)
 			}
+			if err := d.input.Close(); err != nil {
+				log.Printf("Failed to close decoder input: %v", err)
+			}
 		}()
 
-		err := ffmpeg.Input("pipe:",
+		// Build the command
+		cmd := ffmpeg.Input("pipe:",
 			ffmpeg.KwArgs{
-				"format": "mjpeg",
+				"f": "mjpeg",
 			}).
 			Output("pipe:",
 				ffmpeg.KwArgs{
-					"format":  "rawvideo",
+					"f":       "rawvideo",
 					"pix_fmt": "rgb24",
 					"s":       "640x480",
 				}).
 			WithInput(d.input).
 			WithOutput(d.output).
-			Run()
+			Compile()
 
-		if err != nil {
-			log.Printf("FFmpeg decode error: %v", err)
+		d.cmd = cmd
+
+		// Signal startup
+		errChan <- nil
+
+		// Start the process
+		if err := cmd.Start(); err != nil {
+			log.Printf("FFmpeg decoder start error: %v", err)
+			return
+		}
+
+		// Wait for either context cancellation or process completion
+		done := make(chan error)
+		go func() {
+			done <- cmd.Wait()
+		}()
+
+		select {
+		case <-d.ctx.Done():
+			log.Printf("Decoder context cancelled, stopping FFmpeg")
+			if cmd.Process != nil {
+				cmd.Process.Kill()
+			}
+		case err := <-done:
+			if err != nil {
+				log.Printf("FFmpeg decode error: %v", err)
+			}
 		}
 	}()
 
-	return nil
+	return <-errChan
 }
 
 func (d *FFmpegDecoder) Stop() {
 	d.cancel()
+	if d.cmd != nil && d.cmd.Process != nil {
+		d.cmd.Process.Kill()
+	}
 }
