@@ -21,9 +21,17 @@ type FFmpegStreamer struct {
 	cmd    *exec.Cmd
 }
 
-// getFFmpegPath returns path to ffmpeg, checking bundled version first
+// getFFmpegPath returns path to ffmpeg, prioritizing system installation
 func getFFmpegPath() string {
-	// Check if ffmpeg is bundled with executable
+	// First, try to use system FFmpeg (same as manual command)
+	if systemFFmpeg, err := exec.LookPath("ffmpeg"); err == nil {
+		log.Printf("Using system FFmpeg: %s", systemFFmpeg)
+		return systemFFmpeg
+	}
+	
+	log.Printf("System FFmpeg not found in PATH, checking for bundled version...")
+	
+	// Fallback: Check if ffmpeg is bundled with executable
 	exePath, err := os.Executable()
 	if err == nil {
 		exeDir := filepath.Dir(exePath)
@@ -42,8 +50,8 @@ func getFFmpegPath() string {
 		}
 	}
 	
-	// Fallback to system FFmpeg
-	log.Printf("Using system FFmpeg")
+	// Final fallback to system FFmpeg (even if not in PATH, let it try)
+	log.Printf("No bundled FFmpeg found, falling back to system 'ffmpeg' command")
 	return "ffmpeg"
 }
 
