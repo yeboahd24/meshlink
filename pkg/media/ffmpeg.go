@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
@@ -19,6 +21,32 @@ type FFmpegStreamer struct {
 	cmd    *exec.Cmd
 }
 
+// getFFmpegPath returns path to ffmpeg, checking bundled version first
+func getFFmpegPath() string {
+	// Check if ffmpeg is bundled with executable
+	exePath, err := os.Executable()
+	if err == nil {
+		exeDir := filepath.Dir(exePath)
+		
+		// Check for bundled ffmpeg
+		var bundledFFmpeg string
+		if runtime.GOOS == "windows" {
+			bundledFFmpeg = filepath.Join(exeDir, "ffmpeg.exe")
+		} else {
+			bundledFFmpeg = filepath.Join(exeDir, "ffmpeg")
+		}
+		
+		if _, err := os.Stat(bundledFFmpeg); err == nil {
+			log.Printf("Using bundled FFmpeg: %s", bundledFFmpeg)
+			return bundledFFmpeg
+		}
+	}
+	
+	// Fallback to system FFmpeg
+	log.Printf("Using system FFmpeg")
+	return "ffmpeg"
+}
+
 func NewFFmpegStreamer(output io.WriteCloser) *FFmpegStreamer {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &FFmpegStreamer{
@@ -30,13 +58,14 @@ func NewFFmpegStreamer(output io.WriteCloser) *FFmpegStreamer {
 
 // ListVideoDevices lists available video devices (helpful for debugging)
 func ListVideoDevices() error {
+	ffmpegPath := getFFmpegPath()
 	var cmd *exec.Cmd
 	
 	switch runtime.GOOS {
 	case "windows":
-		cmd = exec.Command("ffmpeg", "-list_devices", "true", "-f", "dshow", "-i", "dummy")
+		cmd = exec.Command(ffmpegPath, "-list_devices", "true", "-f", "dshow", "-i", "dummy")
 	case "darwin":
-		cmd = exec.Command("ffmpeg", "-f", "avfoundation", "-list_devices", "true", "-i", "")
+		cmd = exec.Command(ffmpegPath, "-f", "avfoundation", "-list_devices", "true", "-i", "")
 	default:
 		cmd = exec.Command("v4l2-ctl", "--list-devices")
 	}
@@ -61,18 +90,36 @@ func (f *FFmpegStreamer) Start() error {
 
 		switch runtime.GOOS {
 		case "windows":
-			// Try to find the first video device
-			inputDevice = f.findWindowsCamera()
-			if inputDevice == "" {
-				errChan <- fmt.Errorf("no video device found on Windows")
-				return
+			// Try common camera names
+			cameraNames := []string{
+				"Integrated Camera",
+				"USB Camera",
+				"HD Webcam",
+				"Laptop Camera",
+				"HP HD Camera",
+				"0", // Fallback to device index
 			}
-			log.Printf("Using Windows DirectShow camera: %s", inputDevice)
-			stream = ffmpeg.Input(fmt.Sprintf("video=%s", inputDevice), ffmpeg.KwArgs{
-				"f": "dshow",
-				"video_size": "640x480",
-				"framerate": "30",
-			})
+			
+			inputDevice = ""
+			for _, name := range cameraNames {
+				log.Printf("Trying camera: %s", name)
+				if f.testWindowsCamera(name) {
+					inputDevice = name
+					break
+				}
+			}
+			
+			if inputDevice == "" {
+				log.Printf("No camera found, using test pattern")
+				stream = ffmpeg.Input("testsrc=duration=3600:size=640x480:rate=30", ffmpeg.KwArgs{"f": "lavfi"})
+			} else {
+				log.Printf("Using Windows DirectShow camera: %s", inputDevice)
+				stream = ffmpeg.Input(fmt.Sprintf("video=%s", inputDevice), ffmpeg.KwArgs{
+					"f": "dshow",
+					"video_size": "640x480",
+					"framerate": "30",
+				})
+			}
 			
 		case "darwin":
 			log.Printf("Using macOS AVFoundation camera")
@@ -131,36 +178,26 @@ func (f *FFmpegStreamer) Start() error {
 	return <-errChan
 }
 
-func (f *FFmpegStreamer) findWindowsCamera() string {
-	cmd := exec.Command("ffmpeg", "-list_devices", "true", "-f", "dshow", "-i", "dummy")
-	output, _ := cmd.CombinedOutput()
+func (f *FFmpegStreamer) testWindowsCamera(cameraName string) bool {
+	ffmpegPath := getFFmpegPath()
+	// Quick test if camera is accessible
+	cmd := exec.Command(ffmpegPath,
+		"-f", "dshow",
+		"-i", fmt.Sprintf("video=%s", cameraName),
+		"-frames:v", "1",
+		"-f", "null",
+		"-")
 	
-	lines := strings.Split(string(output), "\n")
-	inVideoSection := false
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
 	
-	for _, line := range lines {
-		if strings.Contains(line, "DirectShow video devices") {
-			inVideoSection = true
-			continue
-		}
-		if strings.Contains(line, "DirectShow audio devices") {
-			inVideoSection = false
-			break
-		}
-		
-		if inVideoSection && strings.Contains(line, "\"") {
-			// Extract device name between quotes
-			start := strings.Index(line, "\"")
-			end := strings.LastIndex(line, "\"")
-			if start != -1 && end != -1 && start < end {
-				deviceName := line[start+1 : end]
-				log.Printf("Found video device: %s", deviceName)
-				return deviceName
-			}
-		}
+	// Check if camera was found (no error about device not found)
+	if err != nil && (strings.Contains(outputStr, "Could not find") || 
+		strings.Contains(outputStr, "Cannot open")) {
+		return false
 	}
 	
-	return ""
+	return true
 }
 
 func (f *FFmpegStreamer) Stop() {
