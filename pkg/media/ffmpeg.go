@@ -88,38 +88,63 @@ func (f *FFmpegStreamer) Start() error {
 		var stream *ffmpeg.Stream
 		var inputDevice string
 
-		switch runtime.GOOS {
-		case "windows":
-			// Auto-detect camera from FFmpeg device list
-			inputDevice = f.detectWindowsCamera()
+		// Check if we're in WSL2
+		if f.isWSL2() {
+			log.Printf("🔍 WSL2 detected - attempting Windows camera passthrough")
+			inputDevice = f.detectWSL2Camera()
 			
 			if inputDevice == "" {
-				log.Printf("No camera found, using test pattern")
-				stream = ffmpeg.Input("testsrc=duration=3600:size=640x480:rate=30", ffmpeg.KwArgs{"f": "lavfi"})
+				log.Printf("⚠️  WSL2: No camera passthrough available, using enhanced test pattern")
+				stream = ffmpeg.Input("testsrc=duration=3600:size=640x480:rate=30:color=0x4169E1", ffmpeg.KwArgs{
+					"f": "lavfi",
+				})
 			} else {
-				log.Printf("✅ Using Windows DirectShow camera: %s", inputDevice)
-				stream = ffmpeg.Input(fmt.Sprintf("video=%s", inputDevice), ffmpeg.KwArgs{
+				log.Printf("✅ WSL2: Using camera passthrough: %s", inputDevice)
+				stream = ffmpeg.Input(inputDevice, ffmpeg.KwArgs{
 					"f": "dshow",
 					"video_size": "640x480",
 					"framerate": "30",
 				})
 			}
-			
-		case "darwin":
-			log.Printf("Using macOS AVFoundation camera")
-			stream = ffmpeg.Input("0", ffmpeg.KwArgs{
-				"f":          "avfoundation",
-				"framerate":  "30",
-				"video_size": "640x480",
-			})
-			
-		default:
-			log.Printf("Using Linux V4L2 camera")
-			stream = ffmpeg.Input("/dev/video0", ffmpeg.KwArgs{
-				"f":          "v4l2",
-				"framerate":  "30",
-				"video_size": "640x480",
-			})
+		} else {
+			switch runtime.GOOS {
+			case "windows":
+				// Auto-detect camera from FFmpeg device list
+				inputDevice = f.detectWindowsCamera()
+				
+				if inputDevice == "" {
+					log.Printf("No camera found, using test pattern")
+					stream = ffmpeg.Input("testsrc=duration=3600:size=640x480:rate=30", ffmpeg.KwArgs{"f": "lavfi"})
+				} else {
+					log.Printf("✅ Using Windows DirectShow camera: %s", inputDevice)
+					stream = ffmpeg.Input(fmt.Sprintf("video=%s", inputDevice), ffmpeg.KwArgs{
+						"f": "dshow",
+						"video_size": "640x480",
+						"framerate": "30",
+					})
+				}
+				
+			case "darwin":
+				log.Printf("Using macOS AVFoundation camera")
+				stream = ffmpeg.Input("0", ffmpeg.KwArgs{
+					"f":          "avfoundation",
+					"framerate":  "30",
+					"video_size": "640x480",
+				})
+				
+			default:
+				log.Printf("Using Linux V4L2 camera")
+				if _, err := os.Stat("/dev/video0"); err == nil {
+					stream = ffmpeg.Input("/dev/video0", ffmpeg.KwArgs{
+						"f":          "v4l2",
+						"framerate":  "30",
+						"video_size": "640x480",
+					})
+				} else {
+					log.Printf("No camera found, using test pattern")
+					stream = ffmpeg.Input("testsrc=duration=3600:size=640x480:rate=30", ffmpeg.KwArgs{"f": "lavfi"})
+				}
+			}
 		}
 
 		cmd := stream.
@@ -226,6 +251,75 @@ func (f *FFmpegStreamer) testWindowsCamera(cameraName string) bool {
 	}
 	
 	log.Printf("✅ Camera test passed: %s", cameraName)
+	return true
+}
+
+// isWSL2 detects if we're running in WSL2
+func (f *FFmpegStreamer) isWSL2() bool {
+	if runtime.GOOS != "linux" {
+		return false
+	}
+	
+	// Check for WSL2 indicators
+	if data, err := os.ReadFile("/proc/version"); err == nil {
+		version := string(data)
+		return strings.Contains(version, "microsoft") || strings.Contains(version, "WSL2")
+	}
+	return false
+}
+
+// detectWSL2Camera attempts to detect camera through WSL2-Windows bridge
+func (f *FFmpegStreamer) detectWSL2Camera() string {
+	log.Printf("🔍 WSL2: Checking for Windows camera access...")
+	
+	// Try to use Windows camera through WSL2
+	// This requires special setup but let's try common approaches
+	
+	// Method 1: Try if Windows cameras are accessible via device passthrough
+	testCameras := []string{
+		"Integrated Camera",
+		"USB Camera", 
+		"Camera",
+		"Webcam",
+		"HD Camera",
+	}
+	
+	for _, camera := range testCameras {
+		if f.testWSL2Camera(camera) {
+			return fmt.Sprintf("video=%s", camera)
+		}
+	}
+	
+	log.Printf("⚠️  WSL2: No Windows camera passthrough available")
+	log.Printf("💡 Tip: For best camera support, run the Windows .exe version instead")
+	return ""
+}
+
+// testWSL2Camera tests if a camera is accessible in WSL2
+func (f *FFmpegStreamer) testWSL2Camera(cameraName string) bool {
+	ffmpegPath := getFFmpegPath()
+	log.Printf("🔍 WSL2: Testing camera: %s", cameraName)
+	
+	// Quick test if camera is accessible
+	cmd := exec.Command(ffmpegPath,
+		"-f", "dshow",
+		"-i", fmt.Sprintf("video=%s", cameraName),
+		"-frames:v", "1",
+		"-f", "null",
+		"-",
+		"-y")
+	
+	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+	
+	// Check if camera was found
+	if err != nil || strings.Contains(outputStr, "Could not find") || 
+		strings.Contains(outputStr, "Cannot open") {
+		log.Printf("❌ WSL2: Camera test failed: %s", cameraName)
+		return false
+	}
+	
+	log.Printf("✅ WSL2: Camera test passed: %s", cameraName)
 	return true
 }
 
