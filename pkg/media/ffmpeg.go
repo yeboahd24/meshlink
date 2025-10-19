@@ -117,15 +117,25 @@ func (f *FFmpegStreamer) Start() error {
 		} else {
 			switch runtime.GOOS {
 			case "windows":
-				// Auto-detect camera from FFmpeg device list
-				inputDevice = f.detectWindowsCamera()
+				// Auto-detect camera and audio from FFmpeg device list
+				videoDevice := f.detectWindowsCamera()
+				audioDevice := f.detectWindowsAudio()
 				
-				if inputDevice == "" {
+				if videoDevice == "" {
 					log.Printf("No camera found, using test pattern")
 					stream = ffmpeg.Input("testsrc=duration=3600:size=640x480:rate=30", ffmpeg.KwArgs{"f": "lavfi"})
 				} else {
-					log.Printf("✅ Using Windows DirectShow camera: %s", inputDevice)
-					stream = ffmpeg.Input(fmt.Sprintf("video=%s", inputDevice), ffmpeg.KwArgs{
+					// Build DirectShow input with both video and audio
+					var dshowInput string
+					if audioDevice != "" {
+						dshowInput = fmt.Sprintf("video=%s:audio=%s", videoDevice, audioDevice)
+						log.Printf("✅ Using Windows DirectShow camera: %s with audio: %s", videoDevice, audioDevice)
+					} else {
+						dshowInput = fmt.Sprintf("video=%s", videoDevice)
+						log.Printf("✅ Using Windows DirectShow camera: %s (no audio device)", videoDevice)
+					}
+					
+					stream = ffmpeg.Input(dshowInput, ffmpeg.KwArgs{
 						"f": "dshow",
 						"video_size": "640x480",
 						"framerate": "30",
@@ -233,6 +243,49 @@ func (f *FFmpegStreamer) detectWindowsCamera() string {
 	}
 	
 	log.Printf("⚠️  No working camera found")
+	return ""
+}
+
+func (f *FFmpegStreamer) detectWindowsAudio() string {
+	ffmpegPath := getFFmpegPath()
+	
+	// List all DirectShow audio devices
+	cmd := exec.Command(ffmpegPath, "-list_devices", "true", "-f", "dshow", "-i", "dummy")
+	output, _ := cmd.CombinedOutput()
+	
+	lines := strings.Split(string(output), "\n")
+	inAudioSection := false
+	
+	for _, line := range lines {
+		// Detect audio devices section
+		if strings.Contains(line, "DirectShow audio devices") {
+			inAudioSection = true
+			continue
+		}
+		if inAudioSection && strings.Contains(line, "DirectShow video devices") {
+			inAudioSection = false
+			break
+		}
+		
+		// Extract audio device name from quotes
+		if inAudioSection && strings.Contains(line, "\"") {
+			start := strings.Index(line, "\"")
+			end := strings.LastIndex(line, "\"")
+			if start != -1 && end != -1 && start < end {
+				audioName := line[start+1 : end]
+				log.Printf("🎤 Found audio device: %s", audioName)
+				
+				// For audio, we'll be less strict - just use the first one found
+				// Audio devices are generally more reliable than cameras
+				if audioName != "" {
+					log.Printf("✅ Using audio device: %s", audioName)
+					return audioName
+				}
+			}
+		}
+	}
+	
+	log.Printf("⚠️  No audio device found")
 	return ""
 }
 
