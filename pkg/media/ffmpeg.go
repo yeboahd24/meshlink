@@ -90,30 +90,14 @@ func (f *FFmpegStreamer) Start() error {
 
 		switch runtime.GOOS {
 		case "windows":
-			// Try common camera names
-			cameraNames := []string{
-				"Integrated Camera",
-				"USB Camera",
-				"HD Webcam",
-				"Laptop Camera",
-				"HP HD Camera",
-				"0", // Fallback to device index
-			}
-			
-			inputDevice = ""
-			for _, name := range cameraNames {
-				log.Printf("Trying camera: %s", name)
-				if f.testWindowsCamera(name) {
-					inputDevice = name
-					break
-				}
-			}
+			// Auto-detect camera from FFmpeg device list
+			inputDevice = f.detectWindowsCamera()
 			
 			if inputDevice == "" {
 				log.Printf("No camera found, using test pattern")
 				stream = ffmpeg.Input("testsrc=duration=3600:size=640x480:rate=30", ffmpeg.KwArgs{"f": "lavfi"})
 			} else {
-				log.Printf("Using Windows DirectShow camera: %s", inputDevice)
+				log.Printf("✅ Using Windows DirectShow camera: %s", inputDevice)
 				stream = ffmpeg.Input(fmt.Sprintf("video=%s", inputDevice), ffmpeg.KwArgs{
 					"f": "dshow",
 					"video_size": "640x480",
@@ -178,8 +162,51 @@ func (f *FFmpegStreamer) Start() error {
 	return <-errChan
 }
 
+func (f *FFmpegStreamer) detectWindowsCamera() string {
+	ffmpegPath := getFFmpegPath()
+	
+	// List all DirectShow video devices
+	cmd := exec.Command(ffmpegPath, "-list_devices", "true", "-f", "dshow", "-i", "dummy")
+	output, _ := cmd.CombinedOutput()
+	
+	lines := strings.Split(string(output), "\n")
+	inVideoSection := false
+	
+	for _, line := range lines {
+		// Detect video devices section
+		if strings.Contains(line, "DirectShow video devices") {
+			inVideoSection = true
+			continue
+		}
+		if strings.Contains(line, "DirectShow audio devices") {
+			inVideoSection = false
+			break
+		}
+		
+		// Extract camera name from quotes
+		if inVideoSection && strings.Contains(line, "\"") {
+			start := strings.Index(line, "\"")
+			end := strings.LastIndex(line, "\"")
+			if start != -1 && end != -1 && start < end {
+				cameraName := line[start+1 : end]
+				log.Printf("📹 Found camera: %s", cameraName)
+				
+				// Test if this camera works
+				if f.testWindowsCamera(cameraName) {
+					return cameraName
+				}
+			}
+		}
+	}
+	
+	log.Printf("⚠️  No working camera found")
+	return ""
+}
+
 func (f *FFmpegStreamer) testWindowsCamera(cameraName string) bool {
 	ffmpegPath := getFFmpegPath()
+	log.Printf("🔍 Testing camera: %s", cameraName)
+	
 	// Quick test if camera is accessible
 	cmd := exec.Command(ffmpegPath,
 		"-f", "dshow",
@@ -191,12 +218,14 @@ func (f *FFmpegStreamer) testWindowsCamera(cameraName string) bool {
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)
 	
-	// Check if camera was found (no error about device not found)
+	// Check if camera was found
 	if err != nil && (strings.Contains(outputStr, "Could not find") || 
 		strings.Contains(outputStr, "Cannot open")) {
+		log.Printf("❌ Camera test failed: %s", cameraName)
 		return false
 	}
 	
+	log.Printf("✅ Camera test passed: %s", cameraName)
 	return true
 }
 
