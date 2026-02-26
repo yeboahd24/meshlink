@@ -89,10 +89,9 @@ func (b *Broadcaster) StartStreaming() error {
 		return fmt.Errorf("failed to start camera: %w", err)
 	}
 	
-	// Start audio capture
+	// Start audio capture (non-fatal — video continues without audio)
 	if err := b.audio.Start(); err != nil {
-		b.camera.Stop()
-		return fmt.Errorf("failed to start audio: %w", err)
+		b.logger.Warnf("Audio capture unavailable: %v (continuing with video only)", err)
 	}
 	
 	// Start encoder
@@ -146,16 +145,28 @@ func (b *Broadcaster) streamLoop() {
 				continue
 			}
 			
-			// Publish frame to P2P network
+			// Publish video frame to P2P network
 			if err := b.topic.Publish(b.ctx, frameData); err != nil {
 				b.logger.Errorf("Failed to publish frame %d: %v", b.frameCount+1, err)
 				continue
 			}
-			
+
 			// Update statistics
 			b.frameCount++
 			b.bytesSent += uint64(len(frameData))
-			
+
+			// Capture and publish audio (non-fatal)
+			audioData, err := b.audio.CaptureAudio()
+			if err == nil && len(audioData) > 0 {
+				audioFrame, err := b.encoder.EncodeAudioFrame(audioData, b.frameCount)
+				if err == nil {
+					if pubErr := b.topic.Publish(b.ctx, audioFrame); pubErr != nil {
+						b.logger.Debugf("Failed to publish audio: %v", pubErr)
+					}
+					b.bytesSent += uint64(len(audioFrame))
+				}
+			}
+
 			if b.frameCount%30 == 0 { // Log every second
 				b.logger.Infof("Streamed %d frames, %d bytes total", b.frameCount, b.bytesSent)
 			}

@@ -11,17 +11,18 @@ import (
 )
 
 type Viewer struct {
-	subscription   *pubsub.Subscription
-	logger         *logrus.Logger
-	ctx            context.Context
-	onData         func([]byte)
+	subscription    *pubsub.Subscription
+	logger          *logrus.Logger
+	ctx             context.Context
+	onData          func([]byte)
 	onFrameReceived func(*media.DecodedFrame)
-	isViewing      bool
-	framesReceived uint64
-	bytesReceived  uint64
-	lastFrameTime  time.Time
-	stopChan       chan struct{}
-	decoder        *media.H264Decoder
+	onAudioReceived func(*media.DecodedFrame)
+	isViewing       bool
+	framesReceived  uint64
+	bytesReceived   uint64
+	lastFrameTime   time.Time
+	stopChan        chan struct{}
+	decoder         *media.H264Decoder
 }
 
 func NewViewer(ctx context.Context, ps *pubsub.PubSub, onData func([]byte)) (*Viewer, error) {
@@ -111,11 +112,19 @@ func (v *Viewer) processFrame(data []byte) {
 		return
 	}
 	
-	// Call frame callback if set
+	// Route by frame type
+	if decodedFrame.Metadata.Type == "audio" {
+		if v.onAudioReceived != nil {
+			v.onAudioReceived(decodedFrame)
+		}
+		return
+	}
+
+	// Video frame
 	if v.onFrameReceived != nil {
 		v.onFrameReceived(decodedFrame)
 	}
-	
+
 	// Call legacy data callback
 	if v.onData != nil {
 		v.onData(data)
@@ -130,6 +139,10 @@ func (v *Viewer) processFrame(data []byte) {
 
 func (v *Viewer) SetOnFrameReceived(callback func(*media.DecodedFrame)) {
 	v.onFrameReceived = callback
+}
+
+func (v *Viewer) SetOnAudioReceived(callback func(*media.DecodedFrame)) {
+	v.onAudioReceived = callback
 }
 
 func (v *Viewer) Stop() {

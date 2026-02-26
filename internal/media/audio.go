@@ -2,21 +2,33 @@ package media
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"os/exec"
 	"runtime"
+	"strings"
+	"sync"
+
+	"meshlink/pkg/media"
 )
 
 type AudioCapture struct {
-	deviceID     string
-	sampleRate   int
-	channels     int
-	isCapturing  bool
+	deviceID    string
+	sampleRate  int
+	channels    int
+	isCapturing bool
+
+	cmd         *exec.Cmd
+	pipeReader  io.ReadCloser
+	latestChunk []byte
+	chunkMu     sync.Mutex
+	stopChan    chan struct{}
 }
 
 type AudioPlayer struct {
-	sampleRate  int
-	channels    int
-	isPlaying   bool
+	sampleRate int
+	channels   int
+	isPlaying  bool
 }
 
 func NewAudioCapture() *AudioCapture {
@@ -38,129 +50,194 @@ func (a *AudioCapture) Start() error {
 	if a.isCapturing {
 		return fmt.Errorf("already capturing audio")
 	}
-	
-	if a.isAudioDeviceAvailable() {
-		fmt.Println("Audio: Real microphone detected - starting capture")
-	} else {
-		fmt.Println("Audio: No microphone found - using silence simulation")
+
+	a.stopChan = make(chan struct{})
+
+	device := a.detectAudioDevice()
+	if device == "" {
+		log.Println("Audio: No microphone found — will produce silence")
+		a.isCapturing = true
+		return nil
 	}
-	
+
+	args := a.buildFFmpegArgs(device)
+	ffmpegPath := media.GetFFmpegPath()
+
+	log.Printf("Audio: Starting FFmpeg with: %s %v", ffmpegPath, args)
+	a.cmd = exec.Command(ffmpegPath, args...)
+
+	stdout, err := a.cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("audio: failed to get stdout pipe: %w", err)
+	}
+	a.pipeReader = stdout
+
+	if err := a.cmd.Start(); err != nil {
+		return fmt.Errorf("audio: failed to start FFmpeg: %w", err)
+	}
+
 	a.isCapturing = true
+	go a.readAudioChunks()
+
+	log.Printf("Audio: Capturing from device: %s", device)
 	return nil
 }
 
-func (a *AudioCapture) Stop() {
-	a.isCapturing = false
+func (a *AudioCapture) detectAudioDevice() string {
+	switch runtime.GOOS {
+	case "windows":
+		return a.detectWindowsAudioDevice()
+	case "darwin":
+		return ":0"
+	case "linux":
+		// Check if arecord sees any capture devices
+		cmd := exec.Command("arecord", "-l")
+		if err := cmd.Run(); err == nil {
+			return "default"
+		}
+		return ""
+	default:
+		return ""
+	}
+}
+
+func (a *AudioCapture) detectWindowsAudioDevice() string {
+	ffmpegPath := media.GetFFmpegPath()
+	cmd := exec.Command(ffmpegPath, "-list_devices", "true", "-f", "dshow", "-i", "dummy")
+	output, _ := cmd.CombinedOutput()
+
+	lines := strings.Split(string(output), "\n")
+	inAudioSection := false
+
+	for _, line := range lines {
+		if strings.Contains(line, "DirectShow audio devices") {
+			inAudioSection = true
+			continue
+		}
+		if inAudioSection && strings.Contains(line, "DirectShow video devices") {
+			break
+		}
+		if inAudioSection && strings.Contains(line, "\"") {
+			start := strings.Index(line, "\"")
+			end := strings.LastIndex(line, "\"")
+			if start != -1 && end != -1 && start < end {
+				name := line[start+1 : end]
+				if name != "" {
+					log.Printf("Audio: Found device: %s", name)
+					return name
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func (a *AudioCapture) buildFFmpegArgs(device string) []string {
+	switch runtime.GOOS {
+	case "windows":
+		return []string{
+			"-f", "dshow",
+			"-i", fmt.Sprintf("audio=%s", device),
+			"-ac", fmt.Sprintf("%d", a.channels),
+			"-ar", fmt.Sprintf("%d", a.sampleRate),
+			"-f", "s16le",
+			"-acodec", "pcm_s16le",
+			"pipe:1",
+		}
+	case "darwin":
+		return []string{
+			"-f", "avfoundation",
+			"-i", device,
+			"-ac", fmt.Sprintf("%d", a.channels),
+			"-ar", fmt.Sprintf("%d", a.sampleRate),
+			"-f", "s16le",
+			"-acodec", "pcm_s16le",
+			"pipe:1",
+		}
+	default: // linux
+		return []string{
+			"-f", "alsa",
+			"-i", device,
+			"-ac", fmt.Sprintf("%d", a.channels),
+			"-ar", fmt.Sprintf("%d", a.sampleRate),
+			"-f", "s16le",
+			"-acodec", "pcm_s16le",
+			"pipe:1",
+		}
+	}
+}
+
+// readAudioChunks reads fixed-size PCM chunks (~33ms each) from the FFmpeg pipe.
+// 44100 Hz * 2 channels * 2 bytes/sample * 33ms/1000 ≈ 5,821 bytes per chunk.
+func (a *AudioCapture) readAudioChunks() {
+	chunkSize := a.sampleRate * a.channels * 2 * 33 / 1000 // ~5,821 bytes
+	buf := make([]byte, chunkSize)
+
+	for {
+		select {
+		case <-a.stopChan:
+			return
+		default:
+		}
+
+		_, err := io.ReadFull(a.pipeReader, buf)
+		if err != nil {
+			select {
+			case <-a.stopChan:
+				return
+			default:
+			}
+			log.Printf("Audio: read error: %v", err)
+			return
+		}
+
+		chunk := make([]byte, len(buf))
+		copy(chunk, buf)
+
+		a.chunkMu.Lock()
+		a.latestChunk = chunk
+		a.chunkMu.Unlock()
+	}
 }
 
 func (a *AudioCapture) CaptureAudio() ([]byte, error) {
 	if !a.isCapturing {
 		return nil, fmt.Errorf("not capturing audio")
 	}
-	
-	// Try real audio capture
-	if a.isAudioDeviceAvailable() {
-		audioData, err := a.captureFromSystem()
-		if err == nil && len(audioData) > 0 {
-			return audioData, nil
-		}
+
+	a.chunkMu.Lock()
+	chunk := a.latestChunk
+	a.chunkMu.Unlock()
+
+	if chunk != nil {
+		return chunk, nil
 	}
-	
-	// Fallback to silence simulation
+
 	return a.generateSilence(), nil
 }
 
-func (a *AudioCapture) isAudioDeviceAvailable() bool {
-	switch runtime.GOOS {
-	case "windows":
-		cmd := exec.Command("powershell", "-Command", "Get-WmiObject -Class Win32_SoundDevice")
-		return cmd.Run() == nil
-	case "darwin":
-		cmd := exec.Command("system_profiler", "SPAudioDataType")
-		return cmd.Run() == nil
-	case "linux":
-		cmd := exec.Command("arecord", "-l")
-		return cmd.Run() == nil
-	default:
-		return false
+func (a *AudioCapture) Stop() {
+	if !a.isCapturing {
+		return
 	}
-}
 
-func (a *AudioCapture) captureFromSystem() ([]byte, error) {
-	switch runtime.GOOS {
-	case "windows":
-		return a.captureWindows()
-	case "darwin":
-		return a.captureMacOS()
-	case "linux":
-		return a.captureLinux()
-	default:
-		return nil, fmt.Errorf("unsupported platform: %s", runtime.GOOS)
-	}
-}
+	a.isCapturing = false
+	close(a.stopChan)
 
-func (a *AudioCapture) captureWindows() ([]byte, error) {
-	// Use ffmpeg to capture audio from DirectShow
-	cmd := exec.Command("ffmpeg",
-		"-f", "dshow",
-		"-i", "audio=Microphone",
-		"-t", "0.033", // 33ms for 30fps sync
-		"-f", "wav",
-		"-")
-	
-	output, err := cmd.Output()
-	if err != nil {
-		return a.generateSilence(), nil
+	if a.cmd != nil && a.cmd.Process != nil {
+		a.cmd.Process.Kill()
+		a.cmd.Wait()
 	}
-	
-	return output, nil
-}
 
-func (a *AudioCapture) captureMacOS() ([]byte, error) {
-	// Use ffmpeg to capture from AVFoundation
-	cmd := exec.Command("ffmpeg",
-		"-f", "avfoundation",
-		"-i", ":0", // Default microphone
-		"-t", "0.033",
-		"-f", "wav",
-		"-")
-	
-	output, err := cmd.Output()
-	if err != nil {
-		return a.generateSilence(), nil
+	if a.pipeReader != nil {
+		a.pipeReader.Close()
 	}
-	
-	return output, nil
-}
-
-func (a *AudioCapture) captureLinux() ([]byte, error) {
-	// Use arecord to capture from ALSA
-	cmd := exec.Command("arecord",
-		"-D", "default",
-		"-f", "S16_LE",
-		"-r", "44100",
-		"-c", "2",
-		"-d", "0.033")
-	
-	output, err := cmd.Output()
-	if err != nil {
-		return a.generateSilence(), nil
-	}
-	
-	return output, nil
 }
 
 func (a *AudioCapture) generateSilence() []byte {
 	// Generate 33ms of silence (for 30fps sync)
-	samples := a.sampleRate * a.channels * 33 / 1000 // 33ms worth
-	audioData := make([]byte, samples*2) // 16-bit samples
-	
-	// Fill with silence (zeros)
-	for i := range audioData {
-		audioData[i] = 0
-	}
-	
-	return audioData
+	samples := a.sampleRate * a.channels * 33 / 1000
+	return make([]byte, samples*2) // 16-bit samples, all zeros
 }
 
 // Audio Player methods
@@ -168,7 +245,7 @@ func (p *AudioPlayer) Start() error {
 	if p.isPlaying {
 		return fmt.Errorf("already playing audio")
 	}
-	
+
 	fmt.Println("Audio: Starting audio playback")
 	p.isPlaying = true
 	return nil
@@ -182,12 +259,10 @@ func (p *AudioPlayer) PlayAudio(audioData []byte) error {
 	if !p.isPlaying {
 		return fmt.Errorf("audio player not started")
 	}
-	
-	// For now, just acknowledge audio received
-	// Real implementation would decode and play through speakers
+
 	if len(audioData) > 0 {
 		fmt.Printf("Audio: Playing %d bytes of audio data\n", len(audioData))
 	}
-	
+
 	return nil
 }

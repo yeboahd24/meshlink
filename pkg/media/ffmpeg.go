@@ -21,8 +21,8 @@ type FFmpegStreamer struct {
 	cmd    *exec.Cmd
 }
 
-// getFFmpegPath returns path to ffmpeg, prioritizing system installation
-func getFFmpegPath() string {
+// GetFFmpegPath returns path to ffmpeg, prioritizing system installation
+func GetFFmpegPath() string {
 	// First, try to use system FFmpeg (same as manual command)
 	if systemFFmpeg, err := exec.LookPath("ffmpeg"); err == nil {
 		log.Printf("Using system FFmpeg: %s", systemFFmpeg)
@@ -66,7 +66,7 @@ func NewFFmpegStreamer(output io.WriteCloser) *FFmpegStreamer {
 
 // ListVideoDevices lists available video devices (helpful for debugging)
 func ListVideoDevices() error {
-	ffmpegPath := getFFmpegPath()
+	ffmpegPath := GetFFmpegPath()
 	var cmd *exec.Cmd
 	
 	switch runtime.GOOS {
@@ -206,7 +206,7 @@ func (f *FFmpegStreamer) Start() error {
 }
 
 func (f *FFmpegStreamer) detectWindowsCamera() string {
-	ffmpegPath := getFFmpegPath()
+	ffmpegPath := GetFFmpegPath()
 	
 	// List all DirectShow video devices
 	cmd := exec.Command(ffmpegPath, "-list_devices", "true", "-f", "dshow", "-i", "dummy")
@@ -247,7 +247,7 @@ func (f *FFmpegStreamer) detectWindowsCamera() string {
 }
 
 func (f *FFmpegStreamer) detectWindowsAudio() string {
-	ffmpegPath := getFFmpegPath()
+	ffmpegPath := GetFFmpegPath()
 	
 	// List all DirectShow audio devices
 	cmd := exec.Command(ffmpegPath, "-list_devices", "true", "-f", "dshow", "-i", "dummy")
@@ -297,7 +297,7 @@ func (f *FFmpegStreamer) testWindowsCamera(cameraName string) bool {
 	
 	// The camera was already found in detectWindowsCamera(), so it exists
 	// Let's try a gentler test - just check device info without capturing
-	ffmpegPath := getFFmpegPath()
+	ffmpegPath := GetFFmpegPath()
 	
 	cmd := exec.Command(ffmpegPath,
 		"-f", "dshow",
@@ -363,7 +363,7 @@ func (f *FFmpegStreamer) detectWSL2Camera() string {
 
 // testWSL2Camera tests if a camera is accessible in WSL2
 func (f *FFmpegStreamer) testWSL2Camera(cameraName string) bool {
-	ffmpegPath := getFFmpegPath()
+	ffmpegPath := GetFFmpegPath()
 	log.Printf("🔍 WSL2: Testing camera: %s", cameraName)
 	
 	// Quick test if camera is accessible

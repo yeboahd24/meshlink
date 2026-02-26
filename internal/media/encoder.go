@@ -48,22 +48,30 @@ func (e *H264Encoder) Stop() {
 }
 
 func (e *H264Encoder) EncodeFrame(rawData []byte, frameID uint64) ([]byte, error) {
+	return e.EncodeFrameWithType(rawData, frameID, "video", "mjpeg")
+}
+
+func (e *H264Encoder) EncodeAudioFrame(rawData []byte, frameID uint64) ([]byte, error) {
+	return e.EncodeFrameWithType(rawData, frameID, "audio", "pcm_s16le")
+}
+
+func (e *H264Encoder) EncodeFrameWithType(rawData []byte, frameID uint64, frameType, codec string) ([]byte, error) {
 	if !e.isEncoding {
 		return nil, fmt.Errorf("encoder not started")
 	}
-	
+
 	// Create frame metadata
 	frameInfo := FrameMetadata{
 		FrameID:   frameID,
 		Timestamp: time.Now(),
-		Type:      "video",
-		Codec:     "h264",
+		Type:      frameType,
+		Codec:     codec,
 		Quality:   e.quality,
 		Bitrate:   e.bitrate,
 		Profile:   e.profile,
 		Size:      len(rawData),
 	}
-	
+
 	// Encode frame info + data
 	return e.encodeWithMetadata(frameInfo, rawData)
 }
